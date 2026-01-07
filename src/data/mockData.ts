@@ -81,13 +81,14 @@ export const projects: Project[] = [
   }
 ];
 
-export const whatsappNumbers: WhatsAppNumber[] = [
+export let whatsappNumbers: WhatsAppNumber[] = [
   {
     id: 'wn1',
     projectId: 'p1',
     phoneNumberId: '123456789',
     displayPhoneNumber: '+55 11 99999-1111',
     verifiedName: 'Loja Online Oficial',
+    customName: 'Conta API 1',
     qualityRating: 'HIGH',
     messagingLimitTier: '1000/dia',
     accessToken: 'token_xxx',
@@ -103,6 +104,7 @@ export const whatsappNumbers: WhatsAppNumber[] = [
     phoneNumberId: '123456790',
     displayPhoneNumber: '+55 11 99999-2222',
     verifiedName: 'Vendas Express',
+    customName: 'Conta API 2',
     qualityRating: 'MEDIUM',
     messagingLimitTier: '250/dia',
     accessToken: 'token_yyy',
@@ -189,9 +191,44 @@ export const whatsappNumbers: WhatsAppNumber[] = [
   }
 ];
 
-export const statusHistory: StatusHistory[] = [
+export let statusHistory: StatusHistory[] = [
   {
     id: 'sh1',
+    phoneNumberId: 'wn1',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    changedAt: '2025-01-07T06:00:00Z',
+    observation: 'Status mantido'
+  },
+  {
+    id: 'sh2',
+    phoneNumberId: 'wn1',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    changedAt: '2025-01-06T12:00:00Z',
+    observation: 'Verificação automática'
+  },
+  {
+    id: 'sh3',
+    phoneNumberId: 'wn1',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    previousQuality: 'MEDIUM',
+    changedAt: '2025-01-05T06:00:00Z',
+    observation: 'Recuperação após 7 dias'
+  },
+  {
+    id: 'sh4',
+    phoneNumberId: 'wn1',
+    qualityRating: 'MEDIUM',
+    messagingLimitTier: '250/dia',
+    previousQuality: 'HIGH',
+    changedAt: '2024-12-28T18:00:00Z',
+    expectedRecovery: '2025-01-04T18:00:00Z',
+    observation: 'Queda após campanha de Natal'
+  },
+  {
+    id: 'sh5',
     phoneNumberId: 'wn2',
     qualityRating: 'MEDIUM',
     messagingLimitTier: '250/dia',
@@ -201,7 +238,15 @@ export const statusHistory: StatusHistory[] = [
     observation: 'Queda após campanha de Black Friday'
   },
   {
-    id: 'sh2',
+    id: 'sh6',
+    phoneNumberId: 'wn2',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    changedAt: '2025-01-01T10:00:00Z',
+    observation: 'Status normal'
+  },
+  {
+    id: 'sh7',
     phoneNumberId: 'wn3',
     qualityRating: 'LOW',
     messagingLimitTier: '50/dia',
@@ -209,10 +254,20 @@ export const statusHistory: StatusHistory[] = [
     changedAt: '2025-01-03T18:00:00Z',
     expectedRecovery: '2025-01-10T18:00:00Z',
     observation: 'Alta taxa de denúncias'
+  },
+  {
+    id: 'sh8',
+    phoneNumberId: 'wn3',
+    qualityRating: 'MEDIUM',
+    messagingLimitTier: '250/dia',
+    previousQuality: 'HIGH',
+    changedAt: '2024-12-30T14:00:00Z',
+    expectedRecovery: '2025-01-06T14:00:00Z',
+    observation: 'Primeira queda'
   }
 ];
 
-export const campaigns: Campaign[] = [
+export let campaigns: Campaign[] = [
   {
     id: 'c1',
     userId: '2',
@@ -231,15 +286,16 @@ export const campaigns: Campaign[] = [
   }
 ];
 
-export const actionTypes: ActionType[] = [
-  { id: 'at1', campaignId: 'c1', name: 'Convite', color: '#3B82F6', isActive: true },
-  { id: 'at2', campaignId: 'c1', name: 'Lançamento', color: '#10B981', isActive: true },
-  { id: 'at3', campaignId: 'c1', name: 'Perpétuo', color: '#8B5CF6', isActive: true },
-  { id: 'at4', campaignId: 'c2', name: 'Aquecimento', color: '#F59E0B', isActive: true },
-  { id: 'at5', campaignId: 'c2', name: 'Carrinho Aberto', color: '#EF4444', isActive: true }
+export let actionTypes: ActionType[] = [
+  { id: 'at1', campaignId: 'c1', name: 'Convite', color: '#3B82F6', description: 'Convites para eventos', isActive: true },
+  { id: 'at2', campaignId: 'c1', name: 'Lançamento', color: '#10B981', description: 'Lançamentos de produtos', isActive: true },
+  { id: 'at3', campaignId: 'c1', name: 'Perpétuo', color: '#8B5CF6', description: 'Ofertas perpétuas', isActive: true },
+  { id: 'at4', campaignId: 'c1', name: 'Pós Graduação', color: '#F59E0B', description: 'Cursos pós graduação', isActive: true },
+  { id: 'at5', campaignId: 'c2', name: 'Aquecimento', color: '#F59E0B', description: 'Fase de aquecimento', isActive: true },
+  { id: 'at6', campaignId: 'c2', name: 'Carrinho Aberto', color: '#EF4444', description: 'Período de vendas', isActive: true }
 ];
 
-export const broadcasts: Broadcast[] = [
+export let broadcasts: Broadcast[] = [
   {
     id: 'b1',
     campaignId: 'c1',
@@ -250,6 +306,7 @@ export const broadcasts: Broadcast[] = [
     listName: 'Lista VIP Janeiro',
     templateUsed: 'promo_janeiro_01',
     contactCount: 500,
+    observations: 'Primeiro disparo do mês',
     status: 'completed',
     createdAt: '2025-01-05T14:30:00Z'
   },
@@ -263,15 +320,29 @@ export const broadcasts: Broadcast[] = [
     listName: 'Clientes Ativos',
     templateUsed: 'lancamento_produto',
     contactCount: 1200,
+    observations: 'Lançamento principal',
     status: 'completed',
     createdAt: '2025-01-06T10:00:00Z'
   },
   {
     id: 'b3',
+    campaignId: 'c1',
+    date: '2025-01-07',
+    time: '09:00',
+    actionTypeId: 'at3',
+    phoneNumberId: 'wn2',
+    listName: 'Lista Geral',
+    templateUsed: 'perpetuo_v1',
+    contactCount: 350,
+    status: 'scheduled',
+    createdAt: '2025-01-06T18:00:00Z'
+  },
+  {
+    id: 'b4',
     campaignId: 'c2',
     date: '2025-01-07',
     time: '09:00',
-    actionTypeId: 'at4',
+    actionTypeId: 'at5',
     phoneNumberId: 'wn5',
     listName: 'Leads Quentes',
     templateUsed: 'aquecimento_v2',
@@ -288,3 +359,48 @@ export const activityLogs: ActivityLog[] = [
   { id: 'al4', userId: '1', action: 'approve_user', details: 'Aprovou usuário Carlos Oliveira', timestamp: '2025-01-05T12:00:00Z' },
   { id: 'al5', userId: '3', action: 'login', details: 'Login realizado com sucesso', timestamp: '2025-01-07T10:15:00Z' }
 ];
+
+// Helper functions for mutations (mock)
+export const updateWhatsAppNumber = (id: string, data: Partial<WhatsAppNumber>) => {
+  whatsappNumbers = whatsappNumbers.map(n => 
+    n.id === id ? { ...n, ...data } : n
+  );
+  return whatsappNumbers.find(n => n.id === id);
+};
+
+export const addStatusHistory = (entry: StatusHistory) => {
+  statusHistory = [entry, ...statusHistory];
+  return entry;
+};
+
+export const updateActionType = (id: string, data: Partial<ActionType>) => {
+  actionTypes = actionTypes.map(at => 
+    at.id === id ? { ...at, ...data } : at
+  );
+  return actionTypes.find(at => at.id === id);
+};
+
+export const deleteActionType = (id: string) => {
+  actionTypes = actionTypes.filter(at => at.id !== id);
+};
+
+export const addActionType = (actionType: ActionType) => {
+  actionTypes = [...actionTypes, actionType];
+  return actionType;
+};
+
+export const addBroadcast = (broadcast: Broadcast) => {
+  broadcasts = [broadcast, ...broadcasts];
+  return broadcast;
+};
+
+export const updateBroadcast = (id: string, data: Partial<Broadcast>) => {
+  broadcasts = broadcasts.map(b => 
+    b.id === id ? { ...b, ...data } : b
+  );
+  return broadcasts.find(b => b.id === id);
+};
+
+export const deleteBroadcast = (id: string) => {
+  broadcasts = broadcasts.filter(b => b.id !== id);
+};
