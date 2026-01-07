@@ -15,13 +15,13 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// Protected Route wrapper
+// Protected Route wrapper - must be used inside AuthProvider
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
-// Master-only Route wrapper
+// Master-only Route wrapper - must be used inside AuthProvider
 const MasterRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isMaster } = useAuth();
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -29,6 +29,7 @@ const MasterRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// AppRoutes must be inside AuthProvider to use useAuth
 const AppRoutes = () => {
   const { isAuthenticated } = useAuth();
 
@@ -50,15 +51,15 @@ const AppRoutes = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <AuthProvider>
           <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
