@@ -31,6 +31,7 @@ export interface WhatsAppNumber {
   phoneNumberId: string;
   displayPhoneNumber: string;
   verifiedName: string;
+  customName?: string;
   qualityRating: QualityRating;
   messagingLimitTier: string;
   photo?: string;
@@ -38,6 +39,7 @@ export interface WhatsAppNumber {
   wabaId: string;
   bmId: string;
   isVisible: boolean;
+  observation?: string;
   createdAt: string;
   lastChecked: string;
 }

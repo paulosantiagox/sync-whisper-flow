@@ -1,8 +1,9 @@
 import { WhatsAppNumber } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import QualityBadge from './QualityBadge';
-import { Phone, History, Edit2, Trash2, MessageCircle } from 'lucide-react';
+import { Phone, History, Edit2, Trash2, MessageCircle, Eye, EyeOff, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { addDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -12,9 +13,10 @@ interface NumberCardProps {
   onViewHistory?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onToggleVisibility?: (visible: boolean) => void;
 }
 
-const NumberCard = ({ number, onViewHistory, onEdit, onDelete }: NumberCardProps) => {
+const NumberCard = ({ number, onViewHistory, onEdit, onDelete, onToggleVisibility }: NumberCardProps) => {
   const getRecoveryDate = () => {
     if (number.qualityRating === 'HIGH') return null;
     const recoveryDate = addDays(new Date(number.lastChecked), 7);
@@ -22,11 +24,21 @@ const NumberCard = ({ number, onViewHistory, onEdit, onDelete }: NumberCardProps
   };
 
   const recoveryDate = getRecoveryDate();
+  const daysToRecovery = () => {
+    if (number.qualityRating === 'HIGH') return null;
+    const recoveryDate = addDays(new Date(number.lastChecked), 7);
+    const today = new Date();
+    const diffTime = recoveryDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const days = daysToRecovery();
 
   return (
     <Card className={cn(
       "overflow-hidden transition-all duration-300 hover:shadow-elevated animate-slide-up",
-      !number.isVisible && "opacity-50 grayscale"
+      !number.isVisible && "opacity-50 grayscale scale-95"
     )}>
       {/* Status indicator bar */}
       <div className={cn(
@@ -53,13 +65,21 @@ const NumberCard = ({ number, onViewHistory, onEdit, onDelete }: NumberCardProps
 
           {/* Info */}
           <div className="flex-1 min-w-0 space-y-2">
+            {/* Custom Name */}
+            {number.customName && (
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-primary" />
+                <span className="font-semibold text-foreground text-sm">{number.customName}</span>
+              </div>
+            )}
+            
             <div>
-              <h3 className="font-semibold text-foreground truncate">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                ✓ {number.verifiedName}
+              </p>
+              <h3 className="font-medium text-foreground truncate">
                 {number.displayPhoneNumber}
               </h3>
-              <p className="text-sm text-muted-foreground truncate">
-                {number.verifiedName}
-              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -71,8 +91,11 @@ const NumberCard = ({ number, onViewHistory, onEdit, onDelete }: NumberCardProps
             </div>
 
             {recoveryDate && (
-              <p className="text-xs text-warning flex items-center gap-1">
-                ⏱️ Previsão recuperação: {recoveryDate}
+              <p className={cn(
+                "text-xs flex items-center gap-1",
+                number.qualityRating === 'MEDIUM' ? "text-warning" : "text-destructive"
+              )}>
+                {number.qualityRating === 'MEDIUM' ? '⚠️' : '⛔'} Recuperação em {days} dias ({recoveryDate})
               </p>
             )}
 
@@ -82,8 +105,25 @@ const NumberCard = ({ number, onViewHistory, onEdit, onDelete }: NumberCardProps
           </div>
         </div>
 
+        {/* Visibility Toggle */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+          <div className="flex items-center gap-2">
+            {number.isVisible ? (
+              <Eye className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <EyeOff className="w-4 h-4 text-muted-foreground" />
+            )}
+            <span className="text-xs text-muted-foreground">Visível</span>
+            <Switch 
+              checked={number.isVisible}
+              onCheckedChange={onToggleVisibility}
+              className="scale-75"
+            />
+          </div>
+        </div>
+
         {/* Actions */}
-        <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border">
+        <div className="flex items-center gap-2 mt-3">
           <Button 
             variant="outline" 
             size="sm" 
