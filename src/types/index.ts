@@ -11,6 +11,20 @@ export interface User {
   lastLogin?: string;
 }
 
+// Business Manager types
+export interface BusinessManager {
+  id: string;
+  projectId: string;
+  mainBmName: string;
+  mainBmId: string;
+  subBmName?: string;
+  subBmId?: string;
+  cardName?: string;
+  cardLast4?: string;
+  accessToken: string;
+  createdAt: string;
+}
+
 // Project types
 export interface Project {
   id: string;
@@ -28,6 +42,7 @@ export type QualityRating = 'HIGH' | 'MEDIUM' | 'LOW';
 export interface WhatsAppNumber {
   id: string;
   projectId: string;
+  businessManagerId?: string;
   phoneNumberId: string;
   displayPhoneNumber: string;
   verifiedName: string;
@@ -35,9 +50,7 @@ export interface WhatsAppNumber {
   qualityRating: QualityRating;
   messagingLimitTier: string;
   photo?: string;
-  accessToken: string;
   wabaId: string;
-  bmId: string;
   isVisible: boolean;
   observation?: string;
   createdAt: string;

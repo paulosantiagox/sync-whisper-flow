@@ -1,4 +1,4 @@
-import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog } from '@/types';
+import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager } from '@/types';
 
 export const users: User[] = [
   {
@@ -81,50 +81,84 @@ export const projects: Project[] = [
   }
 ];
 
+export let businessManagers: BusinessManager[] = [
+  {
+    id: 'bm1',
+    projectId: 'p1',
+    mainBmName: 'BM Principal Loja',
+    mainBmId: '111222333444',
+    subBmName: 'Sub BM Vendas',
+    subBmId: '555666777888',
+    cardName: 'Visa Final 4242',
+    cardLast4: '4242',
+    accessToken: 'EAAxxxxxxxxxxxxxxx',
+    createdAt: '2024-04-01T10:00:00Z'
+  },
+  {
+    id: 'bm2',
+    projectId: 'p1',
+    mainBmName: 'BM Secundário',
+    mainBmId: '999888777666',
+    accessToken: 'EAAyyyyyyyyyyyyyyy',
+    createdAt: '2024-05-01T10:00:00Z'
+  },
+  {
+    id: 'bm3',
+    projectId: 'p3',
+    mainBmName: 'BM Agência',
+    mainBmId: '123123123123',
+    subBmName: 'Sub BM Clientes',
+    subBmId: '456456456456',
+    cardName: 'Mastercard Final 1234',
+    cardLast4: '1234',
+    accessToken: 'EAAzzzzzzzzzzzzzzz',
+    createdAt: '2024-07-01T10:00:00Z'
+  }
+];
+
 export let whatsappNumbers: WhatsAppNumber[] = [
   {
     id: 'wn1',
     projectId: 'p1',
+    businessManagerId: 'bm1',
     phoneNumberId: '123456789',
     displayPhoneNumber: '+55 11 99999-1111',
     verifiedName: 'Loja Online Oficial',
     customName: 'Conta API 1',
     qualityRating: 'HIGH',
-    messagingLimitTier: '1000/dia',
-    accessToken: 'token_xxx',
+    messagingLimitTier: '1000',
     wabaId: 'waba_001',
-    bmId: 'bm_001',
     isVisible: true,
+    observation: 'Conta principal para vendas',
     createdAt: '2024-04-02T10:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
   },
   {
     id: 'wn2',
     projectId: 'p1',
+    businessManagerId: 'bm1',
     phoneNumberId: '123456790',
     displayPhoneNumber: '+55 11 99999-2222',
     verifiedName: 'Vendas Express',
     customName: 'Conta API 2',
     qualityRating: 'MEDIUM',
-    messagingLimitTier: '250/dia',
-    accessToken: 'token_yyy',
+    messagingLimitTier: '250',
     wabaId: 'waba_001',
-    bmId: 'bm_001',
     isVisible: true,
+    observation: 'Usada para promoções',
     createdAt: '2024-04-05T11:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
   },
   {
     id: 'wn3',
     projectId: 'p1',
+    businessManagerId: 'bm2',
     phoneNumberId: '123456791',
     displayPhoneNumber: '+55 11 99999-3333',
     verifiedName: 'SAC Loja',
     qualityRating: 'LOW',
-    messagingLimitTier: '50/dia',
-    accessToken: 'token_zzz',
+    messagingLimitTier: '50',
     wabaId: 'waba_001',
-    bmId: 'bm_001',
     isVisible: true,
     createdAt: '2024-04-10T09:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
@@ -136,10 +170,8 @@ export let whatsappNumbers: WhatsAppNumber[] = [
     displayPhoneNumber: '+55 11 98888-4444',
     verifiedName: 'Suporte Técnico 24h',
     qualityRating: 'HIGH',
-    messagingLimitTier: '1000/dia',
-    accessToken: 'token_aaa',
+    messagingLimitTier: '1000',
     wabaId: 'waba_002',
-    bmId: 'bm_001',
     isVisible: true,
     createdAt: '2024-05-20T10:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
@@ -147,14 +179,13 @@ export let whatsappNumbers: WhatsAppNumber[] = [
   {
     id: 'wn5',
     projectId: 'p3',
+    businessManagerId: 'bm3',
     phoneNumberId: '123456793',
     displayPhoneNumber: '+55 21 97777-5555',
     verifiedName: 'Agência Marketing Pro',
     qualityRating: 'HIGH',
-    messagingLimitTier: '1000/dia',
-    accessToken: 'token_bbb',
+    messagingLimitTier: '1000',
     wabaId: 'waba_003',
-    bmId: 'bm_002',
     isVisible: true,
     createdAt: '2024-07-05T14:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
@@ -162,14 +193,13 @@ export let whatsappNumbers: WhatsAppNumber[] = [
   {
     id: 'wn6',
     projectId: 'p3',
+    businessManagerId: 'bm3',
     phoneNumberId: '123456794',
     displayPhoneNumber: '+55 21 97777-6666',
     verifiedName: 'Atendimento Clientes',
     qualityRating: 'MEDIUM',
-    messagingLimitTier: '250/dia',
-    accessToken: 'token_ccc',
+    messagingLimitTier: '250',
     wabaId: 'waba_003',
-    bmId: 'bm_002',
     isVisible: true,
     createdAt: '2024-07-10T11:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
@@ -181,10 +211,8 @@ export let whatsappNumbers: WhatsAppNumber[] = [
     displayPhoneNumber: '+55 21 96666-7777',
     verifiedName: 'Curso Expert Digital',
     qualityRating: 'HIGH',
-    messagingLimitTier: '1000/dia',
-    accessToken: 'token_ddd',
+    messagingLimitTier: '1000',
     wabaId: 'waba_004',
-    bmId: 'bm_002',
     isVisible: true,
     createdAt: '2024-10-15T10:00:00Z',
     lastChecked: '2025-01-07T06:00:00Z'
@@ -403,4 +431,21 @@ export const updateBroadcast = (id: string, data: Partial<Broadcast>) => {
 
 export const deleteBroadcast = (id: string) => {
   broadcasts = broadcasts.filter(b => b.id !== id);
+};
+
+// Business Manager CRUD
+export const addBusinessManager = (bm: BusinessManager) => {
+  businessManagers = [...businessManagers, bm];
+  return bm;
+};
+
+export const updateBusinessManager = (id: string, data: Partial<BusinessManager>) => {
+  businessManagers = businessManagers.map(bm => 
+    bm.id === id ? { ...bm, ...data } : bm
+  );
+  return businessManagers.find(bm => bm.id === id);
+};
+
+export const deleteBusinessManager = (id: string) => {
+  businessManagers = businessManagers.filter(bm => bm.id !== id);
 };
