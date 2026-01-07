@@ -5,26 +5,33 @@ import BroadcastModal from '@/components/modals/BroadcastModal';
 import ActionTypeModal from '@/components/modals/ActionTypeModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import { campaigns, actionTypes, broadcasts, whatsappNumbers, projects, addBroadcast, updateBroadcast, deleteBroadcast, addActionType, updateActionType, deleteActionType } from '@/data/mockData';
-import { Broadcast, ActionType } from '@/types';
+import { Broadcast, ActionType, BroadcastStatus } from '@/types';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Megaphone, Send, Calendar, Search, ChevronRight, Users, MessageCircle, Edit2, Trash2, Tag, Filter } from 'lucide-react';
+import { Plus, Megaphone, Send, Calendar, ChevronRight, Users, MessageCircle, Edit2, Trash2, Tag, Filter, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+const statusOptions: { value: BroadcastStatus; label: string; color: string }[] = [
+  { value: 'preparing', label: 'Em preparação', color: 'bg-muted text-muted-foreground' },
+  { value: 'scheduled', label: 'Agendado', color: 'bg-blue-500 text-white' },
+  { value: 'cancelled', label: 'Cancelado', color: 'bg-destructive text-destructive-foreground' },
+  { value: 'sent', label: 'Enviado', color: 'bg-success text-success-foreground' },
+];
 
 const Campaigns = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [isNewCampaignOpen, setIsNewCampaignOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isActionTypesOpen, setIsActionTypesOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [accountFilter, setAccountFilter] = useState('all');
   const [, forceUpdate] = useState({});
@@ -88,22 +95,102 @@ const Campaigns = () => {
     forceUpdate({});
   };
 
+  const handleStatusChange = (broadcastId: string, newStatus: BroadcastStatus) => {
+    updateBroadcast(broadcastId, { status: newStatus });
+    forceUpdate({});
+    toast({ title: "Status atualizado!" });
+  };
+
+  const getStatusOption = (status: BroadcastStatus) => {
+    return statusOptions.find(s => s.value === status) || statusOptions[0];
+  };
+
   return (
     <DashboardLayout>
       <div className="mb-8">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-foreground">Campanhas de Disparo</h1>
-          <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
-            <DialogTrigger asChild><Button className="gradient-primary"><Plus className="w-4 h-4 mr-2" />Nova Campanha</Button></DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Criar Nova Campanha</DialogTitle></DialogHeader>
-              <form className="space-y-4 mt-4">
-                <div className="space-y-2"><Label htmlFor="name">Nome da Campanha</Label><Input id="name" placeholder="Ex: Lançamento Janeiro" /></div>
-                <div className="space-y-2"><Label htmlFor="description">Descrição</Label><Input id="description" placeholder="Descreva o objetivo da campanha" /></div>
-                <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>Cancelar</Button><Button type="submit" className="gradient-primary">Criar Campanha</Button></div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <Dialog open={isActionTypesOpen} onOpenChange={setIsActionTypesOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Tag className="w-4 h-4 mr-2" />
+                  Tipos de Ação
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    Tipos de Ação
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="mt-4 space-y-4">
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={() => { setEditActionType(null); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Novo Tipo
+                    </Button>
+                  </div>
+                  {campaignActionTypes.length > 0 ? (
+                    <div className="space-y-2">
+                      {campaignActionTypes.map((at) => (
+                        <div key={at.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                          <div className="flex items-center gap-3">
+                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: at.color }} />
+                            <span className="font-medium">{at.name}</span>
+                            {at.description && (
+                              <span className="text-sm text-muted-foreground">- {at.description}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8"
+                              onClick={() => { setEditActionType(at); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="h-8 w-8 text-destructive"
+                              onClick={() => { setDeleteItem({ type: 'actionType', item: at }); setIsActionTypesOpen(false); }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Tag className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">Nenhum tipo cadastrado</p>
+                      <p className="text-xs text-muted-foreground">Crie seu primeiro tipo de ação</p>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nova Campanha
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Criar Nova Campanha</DialogTitle></DialogHeader>
+                <form className="space-y-4 mt-4">
+                  <div className="space-y-2"><Label htmlFor="name">Nome da Campanha</Label><Input id="name" placeholder="Ex: Lançamento Janeiro" /></div>
+                  <div className="space-y-2"><Label htmlFor="description">Descrição</Label><Input id="description" placeholder="Descreva o objetivo da campanha" /></div>
+                  <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>Cancelar</Button><Button type="submit" className="gradient-primary">Criar Campanha</Button></div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
         <p className="text-muted-foreground">Gerencie suas campanhas e registre seus disparos</p>
       </div>
@@ -133,27 +220,6 @@ const Campaigns = () => {
                 <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center"><Users className="w-5 h-5 text-success-foreground" /></div><div><p className="text-2xl font-bold">{getTotalContacts().toLocaleString()}</p><p className="text-xs text-muted-foreground">Contatos Impactados</p></div></div></Card>
                 <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-accent" /></div><div><p className="text-2xl font-bold">{campaignActionTypes.length}</p><p className="text-xs text-muted-foreground">Tipos de Ação</p></div></div></Card>
               </div>
-
-              {/* Action Types */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="flex items-center gap-2"><Tag className="w-5 h-5" />Tipos de Ação</CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => { setEditActionType(null); setIsNewActionTypeOpen(true); }}><Plus className="w-4 h-4 mr-1" />Novo Tipo</Button>
-                </CardHeader>
-                <CardContent>
-                  {campaignActionTypes.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {campaignActionTypes.map((at) => (
-                        <div key={at.id} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-white group" style={{ backgroundColor: at.color }}>
-                          {at.name}
-                          <button onClick={() => { setEditActionType(at); setIsNewActionTypeOpen(true); }} className="ml-1 opacity-70 hover:opacity-100"><Edit2 className="w-3 h-3" /></button>
-                          <button onClick={() => setDeleteItem({ type: 'actionType', item: at })} className="opacity-70 hover:opacity-100"><Trash2 className="w-3 h-3" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-sm text-muted-foreground">Nenhum tipo cadastrado. Crie seu primeiro tipo de ação.</p>}
-                </CardContent>
-              </Card>
 
               {/* Broadcasts Table */}
               <Card>
@@ -191,6 +257,7 @@ const Campaigns = () => {
                           {campaignBroadcasts.map((broadcast) => {
                             const actionType = actionTypes.find(at => at.id === broadcast.actionTypeId);
                             const phoneNum = whatsappNumbers.find(n => n.id === broadcast.phoneNumberId);
+                            const currentStatus = getStatusOption(broadcast.status);
                             return (
                               <TableRow key={broadcast.id}>
                                 <TableCell><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /><span>{format(new Date(broadcast.date), "dd/MM", { locale: ptBR })} {broadcast.time}</span></div></TableCell>
@@ -199,7 +266,23 @@ const Campaigns = () => {
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.templateUsed}</TableCell>
                                 <TableCell className="text-right font-medium">{broadcast.contactCount.toLocaleString()}</TableCell>
-                                <TableCell><Badge variant={broadcast.status === 'completed' ? 'default' : broadcast.status === 'scheduled' ? 'secondary' : 'destructive'} className={broadcast.status === 'completed' ? 'bg-success' : ''}>{broadcast.status === 'completed' ? 'Concluído' : broadcast.status === 'scheduled' ? 'Agendado' : 'Falhou'}</Badge></TableCell>
+                                <TableCell>
+                                  <Select 
+                                    value={broadcast.status} 
+                                    onValueChange={(value) => handleStatusChange(broadcast.id, value as BroadcastStatus)}
+                                  >
+                                    <SelectTrigger className={`w-[140px] h-8 text-xs ${currentStatus.color}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {statusOptions.map((option) => (
+                                        <SelectItem key={option.value} value={option.value}>
+                                          {option.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1">
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditBroadcast(broadcast); setIsNewBroadcastOpen(true); }}><Edit2 className="w-4 h-4" /></Button>

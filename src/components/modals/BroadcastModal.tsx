@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Broadcast, ActionType, WhatsAppNumber } from '@/types';
+import { useState, useEffect } from 'react';
+import { Broadcast, ActionType, WhatsAppNumber, BroadcastStatus } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,7 +100,7 @@ const BroadcastModal = ({
       templateUsed: templateUsed.trim(),
       contactCount: parseInt(contactCount),
       observations: observations.trim() || undefined,
-      status: broadcast?.status || 'completed',
+      status: broadcast?.status || 'preparing',
       createdAt: broadcast?.createdAt || new Date().toISOString(),
     };
     

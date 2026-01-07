@@ -77,6 +77,8 @@ export interface ActionType {
 }
 
 // Broadcast types
+export type BroadcastStatus = 'preparing' | 'scheduled' | 'cancelled' | 'sent';
+
 export interface Broadcast {
   id: string;
   campaignId: string;
@@ -90,7 +92,7 @@ export interface Broadcast {
   contactCount: number;
   observations?: string;
   tags?: string[];
-  status: 'completed' | 'scheduled' | 'failed';
+  status: BroadcastStatus;
   createdAt: string;
 }
 

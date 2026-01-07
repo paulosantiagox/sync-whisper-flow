@@ -307,7 +307,7 @@ export let broadcasts: Broadcast[] = [
     templateUsed: 'promo_janeiro_01',
     contactCount: 500,
     observations: 'Primeiro disparo do mês',
-    status: 'completed',
+    status: 'sent',
     createdAt: '2025-01-05T14:30:00Z'
   },
   {
@@ -321,7 +321,7 @@ export let broadcasts: Broadcast[] = [
     templateUsed: 'lancamento_produto',
     contactCount: 1200,
     observations: 'Lançamento principal',
-    status: 'completed',
+    status: 'sent',
     createdAt: '2025-01-06T10:00:00Z'
   },
   {

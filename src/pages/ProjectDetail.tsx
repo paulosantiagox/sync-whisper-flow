@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import NumberCard from '@/components/dashboard/NumberCard';
 import EditNumberModal from '@/components/modals/EditNumberModal';
 import StatusHistoryModal from '@/components/modals/StatusHistoryModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
+import QualityBadge from '@/components/dashboard/QualityBadge';
 import { projects, whatsappNumbers, updateWhatsAppNumber } from '@/data/mockData';
 import { WhatsAppNumber } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -13,19 +13,26 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, 
-  Filter, RefreshCw, Eye, EyeOff, Loader2
+  RefreshCw, Eye, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+type SortOption = 'quality-asc' | 'quality-desc' | 'date-asc' | 'date-desc';
+
+const qualityOrder = { HIGH: 1, MEDIUM: 2, LOW: 3 };
 
 const ProjectDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showHidden, setShowHidden] = useState(true);
+  const [sortBy, setSortBy] = useState<SortOption>('quality-asc');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   
@@ -40,17 +47,36 @@ const ProjectDetail = () => {
   const project = projects.find(p => p.id === id);
   const numbers = whatsappNumbers.filter(n => n.projectId === id);
 
-  const filteredNumbers = useMemo(() => {
-    return numbers.filter(n => {
+  const { activeNumbers, inactiveNumbers } = useMemo(() => {
+    const filtered = numbers.filter(n => {
       const matchesSearch = 
         n.displayPhoneNumber.includes(searchQuery) ||
         n.verifiedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (n.customName?.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesStatus = statusFilter === 'all' || n.qualityRating === statusFilter;
-      const matchesVisibility = showHidden || n.isVisible;
-      return matchesSearch && matchesStatus && matchesVisibility;
+      return matchesSearch && matchesStatus;
     });
-  }, [numbers, searchQuery, statusFilter, showHidden]);
+
+    const sortFn = (a: WhatsAppNumber, b: WhatsAppNumber) => {
+      switch (sortBy) {
+        case 'quality-asc':
+          return qualityOrder[a.qualityRating] - qualityOrder[b.qualityRating];
+        case 'quality-desc':
+          return qualityOrder[b.qualityRating] - qualityOrder[a.qualityRating];
+        case 'date-asc':
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case 'date-desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        default:
+          return 0;
+      }
+    };
+
+    const active = filtered.filter(n => n.isVisible).sort(sortFn);
+    const inactive = filtered.filter(n => !n.isVisible).sort(sortFn);
+
+    return { activeNumbers: active, inactiveNumbers: inactive };
+  }, [numbers, searchQuery, statusFilter, sortBy]);
 
   const statusCounts = {
     high: numbers.filter(n => n.qualityRating === 'HIGH').length,
@@ -88,12 +114,74 @@ const ProjectDetail = () => {
   const handleToggleVisibility = (num: WhatsAppNumber, visible: boolean) => {
     updateWhatsAppNumber(num.id, { isVisible: visible });
     forceUpdate({});
+    toast({ 
+      title: visible ? "Número ativado" : "Número desativado",
+      description: visible ? "O número agora está visível na lista principal." : "O número foi movido para a seção de desativados."
+    });
   };
 
   const handleDeleteNumber = () => {
     toast({ title: "Número removido", description: "O número foi removido do projeto." });
     setDeleteNumber(null);
   };
+
+  const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => (
+    <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
+      <TableCell>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            {number.photo ? (
+              <img src={number.photo} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <Phone className="w-5 h-5 text-muted-foreground" />
+            )}
+          </div>
+          <div>
+            {number.customName && (
+              <p className="font-medium text-sm">{number.customName}</p>
+            )}
+            <p className={`${number.customName ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}`}>
+              {number.verifiedName}
+            </p>
+            <p className="text-xs text-muted-foreground">{number.displayPhoneNumber}</p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <QualityBadge rating={number.qualityRating} />
+      </TableCell>
+      <TableCell>
+        <span className="text-sm">{number.messagingLimitTier}/dia</span>
+      </TableCell>
+      <TableCell>
+        <span className="text-xs text-muted-foreground font-mono">{number.phoneNumberId}</span>
+      </TableCell>
+      <TableCell>
+        <span className="text-xs text-muted-foreground">
+          {format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}
+        </span>
+      </TableCell>
+      <TableCell>
+        <Switch
+          checked={number.isVisible}
+          onCheckedChange={(checked) => handleToggleVisibility(number, checked)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryNumber(number)}>
+            <History className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
+            <Edit2 className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteNumber(number)}>
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
 
   if (!project) {
     return (
@@ -172,7 +260,9 @@ const ProjectDetail = () => {
           <Input placeholder="Buscar números..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]"><Filter className="w-4 h-4 mr-2" /><SelectValue placeholder="Filtrar status" /></SelectTrigger>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filtrar status" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os Status</SelectItem>
             <SelectItem value="HIGH">🟢 Alta Qualidade</SelectItem>
@@ -180,27 +270,42 @@ const ProjectDetail = () => {
             <SelectItem value="LOW">🔴 Baixa Qualidade</SelectItem>
           </SelectContent>
         </Select>
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-background">
-          {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          <span className="text-sm">Mostrar ocultos</span>
-          <Switch checked={showHidden} onCheckedChange={setShowHidden} />
-        </div>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+          <SelectTrigger className="w-[200px]">
+            <ArrowUpDown className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Ordenar por" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quality-asc">Qualidade: Alta → Baixa</SelectItem>
+            <SelectItem value="quality-desc">Qualidade: Baixa → Alta</SelectItem>
+            <SelectItem value="date-desc">Data: Mais Recente</SelectItem>
+            <SelectItem value="date-asc">Data: Mais Antigo</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Numbers Grid */}
-      {filteredNumbers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNumbers.map((number) => (
-            <NumberCard 
-              key={number.id}
-              number={number}
-              onViewHistory={() => setHistoryNumber(number)}
-              onEdit={() => setEditNumber(number)}
-              onDelete={() => setDeleteNumber(number)}
-              onToggleVisibility={(visible) => handleToggleVisibility(number, visible)}
-            />
-          ))}
-        </div>
+      {/* Numbers List - Active */}
+      {activeNumbers.length > 0 ? (
+        <Card className="mb-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Número</TableHead>
+                  <TableHead>Qualidade</TableHead>
+                  <TableHead>Limite</TableHead>
+                  <TableHead>Phone ID</TableHead>
+                  <TableHead>Última Verificação</TableHead>
+                  <TableHead>Ativo</TableHead>
+                  <TableHead>Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activeNumbers.map((number) => renderNumberRow(number))}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
       ) : numbers.length === 0 ? (
         <Card className="p-12 text-center animate-fade-in">
           <Phone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
@@ -208,8 +313,38 @@ const ProjectDetail = () => {
           <p className="text-muted-foreground mb-4">Adicione seus números WhatsApp Business para começar o monitoramento.</p>
           <Button className="gradient-primary" onClick={() => setIsAddDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Adicionar Primeiro Número</Button>
         </Card>
-      ) : (
+      ) : activeNumbers.length === 0 && inactiveNumbers.length === 0 ? (
         <Card className="p-8 text-center"><p className="text-muted-foreground">Nenhum número encontrado com os filtros selecionados</p></Card>
+      ) : null}
+
+      {/* Numbers List - Inactive */}
+      {inactiveNumbers.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-2 mb-4">
+            <EyeOff className="w-5 h-5 text-muted-foreground" />
+            <h3 className="text-lg font-semibold text-muted-foreground">Desativados ({inactiveNumbers.length})</h3>
+          </div>
+          <Card className="border-dashed">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Qualidade</TableHead>
+                    <TableHead>Limite</TableHead>
+                    <TableHead>Phone ID</TableHead>
+                    <TableHead>Última Verificação</TableHead>
+                    <TableHead>Ativo</TableHead>
+                    <TableHead>Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inactiveNumbers.map((number) => renderNumberRow(number, true))}
+                </TableBody>
+              </Table>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* Modals */}
