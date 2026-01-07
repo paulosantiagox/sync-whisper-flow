@@ -248,6 +248,7 @@ const Campaigns = () => {
                             <TableHead>Conta</TableHead>
                             <TableHead>Lista</TableHead>
                             <TableHead>Template</TableHead>
+                            <TableHead>Observação</TableHead>
                             <TableHead className="text-right">Contatos</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Ações</TableHead>
@@ -265,6 +266,13 @@ const Campaigns = () => {
                                 <TableCell className="text-muted-foreground text-sm">{phoneNum?.customName || phoneNum?.displayPhoneNumber || 'N/A'}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.templateUsed}</TableCell>
+                                <TableCell>
+                                  {broadcast.observations ? (
+                                    <span className="text-xs text-muted-foreground line-clamp-2 max-w-[150px]">{broadcast.observations}</span>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-right font-medium">{broadcast.contactCount.toLocaleString()}</TableCell>
                                 <TableCell>
                                   <Select 

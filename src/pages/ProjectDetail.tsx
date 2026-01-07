@@ -3,10 +3,11 @@ import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import EditNumberModal from '@/components/modals/EditNumberModal';
 import StatusHistoryModal from '@/components/modals/StatusHistoryModal';
+import BMModal from '@/components/modals/BMModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import QualityBadge from '@/components/dashboard/QualityBadge';
-import { projects, whatsappNumbers, updateWhatsAppNumber } from '@/data/mockData';
-import { WhatsAppNumber } from '@/types';
+import { projects, whatsappNumbers, businessManagers, updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager } from '@/data/mockData';
+import { WhatsAppNumber, BusinessManager } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -17,7 +18,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, 
-  RefreshCw, Eye, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown
+  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, FileText
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -32,20 +33,30 @@ const ProjectDetail = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [bmFilter, setBmFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('quality-asc');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isBMListOpen, setIsBMListOpen] = useState(false);
   
   // Modal states
   const [editNumber, setEditNumber] = useState<WhatsAppNumber | null>(null);
   const [historyNumber, setHistoryNumber] = useState<WhatsAppNumber | null>(null);
   const [deleteNumber, setDeleteNumber] = useState<WhatsAppNumber | null>(null);
+  const [editBM, setEditBM] = useState<BusinessManager | null>(null);
+  const [isNewBMOpen, setIsNewBMOpen] = useState(false);
+  const [deleteBM, setDeleteBM] = useState<BusinessManager | null>(null);
+  
+  // Add number form
+  const [selectedBMId, setSelectedBMId] = useState('');
+  const [newCustomName, setNewCustomName] = useState('');
   
   // Force re-render
   const [, forceUpdate] = useState({});
 
   const project = projects.find(p => p.id === id);
   const numbers = whatsappNumbers.filter(n => n.projectId === id);
+  const projectBMs = businessManagers.filter(bm => bm.projectId === id);
 
   const { activeNumbers, inactiveNumbers } = useMemo(() => {
     const filtered = numbers.filter(n => {
@@ -54,7 +65,8 @@ const ProjectDetail = () => {
         n.verifiedName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (n.customName?.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesStatus = statusFilter === 'all' || n.qualityRating === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesBM = bmFilter === 'all' || n.businessManagerId === bmFilter;
+      return matchesSearch && matchesStatus && matchesBM;
     });
 
     const sortFn = (a: WhatsAppNumber, b: WhatsAppNumber) => {
@@ -76,7 +88,7 @@ const ProjectDetail = () => {
     const inactive = filtered.filter(n => !n.isVisible).sort(sortFn);
 
     return { activeNumbers: active, inactiveNumbers: inactive };
-  }, [numbers, searchQuery, statusFilter, sortBy]);
+  }, [numbers, searchQuery, statusFilter, bmFilter, sortBy]);
 
   const statusCounts = {
     high: numbers.filter(n => n.qualityRating === 'HIGH').length,
@@ -125,63 +137,107 @@ const ProjectDetail = () => {
     setDeleteNumber(null);
   };
 
-  const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => (
-    <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-            {number.photo ? (
-              <img src={number.photo} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <Phone className="w-5 h-5 text-muted-foreground" />
-            )}
+  const handleSaveBM = (bm: BusinessManager) => {
+    if (editBM) {
+      updateBusinessManager(bm.id, bm);
+      toast({ title: "BM atualizada!", description: "Alterações salvas com sucesso." });
+    } else {
+      addBusinessManager(bm);
+      toast({ title: "BM cadastrada!", description: "Nova Business Manager adicionada." });
+    }
+    setEditBM(null);
+    forceUpdate({});
+  };
+
+  const handleDeleteBM = () => {
+    if (deleteBM) {
+      deleteBusinessManager(deleteBM.id);
+      toast({ title: "BM removida", description: "Business Manager removida do projeto." });
+      setDeleteBM(null);
+      forceUpdate({});
+    }
+  };
+
+  const getBMName = (bmId?: string) => {
+    if (!bmId) return '-';
+    const bm = businessManagers.find(b => b.id === bmId);
+    return bm?.mainBmName || '-';
+  };
+
+  const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => {
+    const bm = businessManagers.find(b => b.id === number.businessManagerId);
+    return (
+      <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+              {number.photo ? (
+                <img src={number.photo} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Phone className="w-5 h-5 text-muted-foreground" />
+              )}
+            </div>
+            <div>
+              {number.customName && (
+                <p className="font-medium text-sm">{number.customName}</p>
+              )}
+              <p className={`${number.customName ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}`}>
+                {number.verifiedName}
+              </p>
+              <p className="text-xs text-muted-foreground">{number.displayPhoneNumber}</p>
+            </div>
           </div>
-          <div>
-            {number.customName && (
-              <p className="font-medium text-sm">{number.customName}</p>
-            )}
-            <p className={`${number.customName ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}`}>
-              {number.verifiedName}
-            </p>
-            <p className="text-xs text-muted-foreground">{number.displayPhoneNumber}</p>
+        </TableCell>
+        <TableCell>
+          <QualityBadge rating={number.qualityRating} />
+        </TableCell>
+        <TableCell>
+          <span className="text-sm">{number.messagingLimitTier}/dia</span>
+        </TableCell>
+        <TableCell>
+          {bm ? (
+            <div className="text-xs">
+              <p className="font-medium text-foreground">{bm.mainBmName}</p>
+              <p className="text-muted-foreground">ID: {bm.mainBmId}</p>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          {number.observation ? (
+            <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">{number.observation}</span>
+          ) : (
+            <span className="text-xs text-muted-foreground">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <span className="text-xs text-muted-foreground">
+            {format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}
+          </span>
+        </TableCell>
+        <TableCell>
+          <Switch
+            checked={number.isVisible}
+            onCheckedChange={(checked) => handleToggleVisibility(number, checked)}
+          />
+        </TableCell>
+        <TableCell>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryNumber(number)}>
+              <History className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
+              <Edit2 className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteNumber(number)}>
+              <Trash2 className="w-4 h-4" />
+            </Button>
           </div>
-        </div>
-      </TableCell>
-      <TableCell>
-        <QualityBadge rating={number.qualityRating} />
-      </TableCell>
-      <TableCell>
-        <span className="text-sm">{number.messagingLimitTier}/dia</span>
-      </TableCell>
-      <TableCell>
-        <span className="text-xs text-muted-foreground font-mono">{number.phoneNumberId}</span>
-      </TableCell>
-      <TableCell>
-        <span className="text-xs text-muted-foreground">
-          {format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}
-        </span>
-      </TableCell>
-      <TableCell>
-        <Switch
-          checked={number.isVisible}
-          onCheckedChange={(checked) => handleToggleVisibility(number, checked)}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryNumber(number)}>
-            <History className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
-            <Edit2 className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteNumber(number)}>
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        </div>
-      </TableCell>
-    </TableRow>
-  );
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   if (!project) {
     return (
@@ -214,11 +270,83 @@ const ProjectDetail = () => {
             {project.description && <p className="text-muted-foreground mt-1">{project.description}</p>}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" onClick={handleUpdateAllStatus} disabled={isUpdating || numbers.length === 0}>
               {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               {isUpdating ? 'Atualizando...' : 'Atualizar Status'}
             </Button>
+            
+            {/* BM List Modal */}
+            <Dialog open={isBMListOpen} onOpenChange={setIsBMListOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  Cadastrar BM
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Building2 className="w-5 h-5" />
+                    Business Managers
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="mt-4 space-y-4">
+                  <div className="flex justify-end">
+                    <Button size="sm" onClick={() => { setEditBM(null); setIsNewBMOpen(true); setIsBMListOpen(false); }}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Nova BM
+                    </Button>
+                  </div>
+                  {projectBMs.length > 0 ? (
+                    <div className="space-y-2">
+                      {projectBMs.map((bm) => (
+                        <div key={bm.id} className="p-3 rounded-lg border bg-card">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="font-medium text-sm">{bm.mainBmName}</p>
+                              <p className="text-xs text-muted-foreground">ID: {bm.mainBmId}</p>
+                              {bm.subBmName && (
+                                <p className="text-xs text-muted-foreground">Sub: {bm.subBmName} ({bm.subBmId})</p>
+                              )}
+                              {bm.cardName && (
+                                <p className="text-xs text-muted-foreground">Cartão: {bm.cardName}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => { setEditBM(bm); setIsNewBMOpen(true); setIsBMListOpen(false); }}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-destructive"
+                                onClick={() => { setDeleteBM(bm); setIsBMListOpen(false); }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Building2 className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">Nenhuma BM cadastrada</p>
+                      <p className="text-xs text-muted-foreground">Cadastre sua primeira Business Manager</p>
+                    </div>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Add Number Dialog */}
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button className="gradient-primary"><Plus className="w-4 h-4 mr-2" />Adicionar Número</Button>
@@ -226,13 +354,62 @@ const ProjectDetail = () => {
               <DialogContent className="max-w-lg">
                 <DialogHeader><DialogTitle>Adicionar Número WhatsApp</DialogTitle></DialogHeader>
                 <form className="space-y-4 mt-4">
-                  <div className="space-y-2"><Label htmlFor="token">Token de Acesso</Label><Input id="token" placeholder="EAAxxxxxxx..." type="password" /></div>
-                  <div className="space-y-2"><Label htmlFor="bmId">Business Manager ID</Label><Input id="bmId" placeholder="123456789" /></div>
-                  <div className="space-y-2"><Label htmlFor="wabaId">WABA ID</Label><Input id="wabaId" placeholder="987654321" /></div>
-                  <div className="space-y-2"><Label htmlFor="customName">Nome Personalizado (opcional)</Label><Input id="customName" placeholder="Ex: Conta API 1" /></div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bmSelect">Selecionar BM *</Label>
+                    <Select value={selectedBMId} onValueChange={setSelectedBMId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma BM cadastrada" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projectBMs.length > 0 ? (
+                          projectBMs.map(bm => (
+                            <SelectItem key={bm.id} value={bm.id}>
+                              {bm.mainBmName} - {bm.mainBmId}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="none" disabled>Nenhuma BM cadastrada</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {projectBMs.length === 0 && (
+                      <p className="text-xs text-destructive">Cadastre uma BM primeiro antes de adicionar números</p>
+                    )}
+                  </div>
+                  
+                  {selectedBMId && (
+                    <div className="p-3 bg-muted rounded-lg text-sm">
+                      <p className="font-medium mb-1">Dados da BM selecionada:</p>
+                      {(() => {
+                        const selectedBM = projectBMs.find(b => b.id === selectedBMId);
+                        return selectedBM ? (
+                          <div className="text-muted-foreground text-xs space-y-1">
+                            <p>Nome: {selectedBM.mainBmName}</p>
+                            <p>ID: {selectedBM.mainBmId}</p>
+                            {selectedBM.subBmName && <p>Sub BM: {selectedBM.subBmName}</p>}
+                            <p>Token: ****{selectedBM.accessToken.slice(-4)}</p>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="wabaId">WABA ID</Label>
+                    <Input id="wabaId" placeholder="987654321" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customName">Nome Personalizado (opcional)</Label>
+                    <Input 
+                      id="customName" 
+                      placeholder="Ex: Conta API 1" 
+                      value={newCustomName}
+                      onChange={(e) => setNewCustomName(e.target.value)}
+                    />
+                  </div>
                   <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
-                    <Button type="submit" className="gradient-primary">Buscar Números</Button>
+                    <Button type="submit" className="gradient-primary" disabled={!selectedBMId}>Buscar Números</Button>
                   </div>
                 </form>
               </DialogContent>
@@ -249,12 +426,13 @@ const ProjectDetail = () => {
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Phone className="w-4 h-4" />Total de Números</div><p className="text-3xl font-bold text-primary-foreground">{numbers.length}</p></div>
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Activity className="w-4 h-4" />Status</div><div className="flex items-center gap-2 text-primary-foreground"><span className="text-lg font-semibold">🟢 {statusCounts.high}</span><span className="text-lg font-semibold">🟡 {statusCounts.medium}</span><span className="text-lg font-semibold">🔴 {statusCounts.low}</span></div></div>
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><MessageCircle className="w-4 h-4" />Limite Total</div><p className="text-3xl font-bold text-primary-foreground">{totalLimit.toLocaleString()}/dia</p></div>
+            <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Building2 className="w-4 h-4" />BMs Cadastradas</div><p className="text-3xl font-bold text-primary-foreground">{projectBMs.length}</p></div>
           </div>
         </div>
       </Card>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Buscar números..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
@@ -268,6 +446,18 @@ const ProjectDetail = () => {
             <SelectItem value="HIGH">🟢 Alta Qualidade</SelectItem>
             <SelectItem value="MEDIUM">🟡 Média Qualidade</SelectItem>
             <SelectItem value="LOW">🔴 Baixa Qualidade</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={bmFilter} onValueChange={setBmFilter}>
+          <SelectTrigger className="w-[180px]">
+            <Building2 className="w-4 h-4 mr-2" />
+            <SelectValue placeholder="Filtrar por BM" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as BMs</SelectItem>
+            {projectBMs.map(bm => (
+              <SelectItem key={bm.id} value={bm.id}>{bm.mainBmName}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
@@ -294,7 +484,8 @@ const ProjectDetail = () => {
                   <TableHead>Número</TableHead>
                   <TableHead>Qualidade</TableHead>
                   <TableHead>Limite</TableHead>
-                  <TableHead>Phone ID</TableHead>
+                  <TableHead>BM</TableHead>
+                  <TableHead>Observação</TableHead>
                   <TableHead>Última Verificação</TableHead>
                   <TableHead>Ativo</TableHead>
                   <TableHead>Ações</TableHead>
@@ -332,7 +523,8 @@ const ProjectDetail = () => {
                     <TableHead>Número</TableHead>
                     <TableHead>Qualidade</TableHead>
                     <TableHead>Limite</TableHead>
-                    <TableHead>Phone ID</TableHead>
+                    <TableHead>BM</TableHead>
+                    <TableHead>Observação</TableHead>
                     <TableHead>Última Verificação</TableHead>
                     <TableHead>Ativo</TableHead>
                     <TableHead>Ações</TableHead>
@@ -350,7 +542,9 @@ const ProjectDetail = () => {
       {/* Modals */}
       <EditNumberModal number={editNumber} open={!!editNumber} onOpenChange={(open) => !open && setEditNumber(null)} onSave={handleSaveNumber} />
       <StatusHistoryModal number={historyNumber} open={!!historyNumber} onOpenChange={(open) => !open && setHistoryNumber(null)} />
+      <BMModal bm={editBM} projectId={id || ''} open={isNewBMOpen} onOpenChange={setIsNewBMOpen} onSave={handleSaveBM} />
       <ConfirmDialog open={!!deleteNumber} onOpenChange={(open) => !open && setDeleteNumber(null)} title="Remover Número" description={`Tem certeza que deseja remover o número ${deleteNumber?.displayPhoneNumber}? Esta ação não pode ser desfeita.`} confirmText="Remover" onConfirm={handleDeleteNumber} variant="destructive" />
+      <ConfirmDialog open={!!deleteBM} onOpenChange={(open) => !open && setDeleteBM(null)} title="Remover BM" description={`Tem certeza que deseja remover a BM "${deleteBM?.mainBmName}"? Esta ação não pode ser desfeita.`} confirmText="Remover" onConfirm={handleDeleteBM} variant="destructive" />
     </DashboardLayout>
   );
 };
