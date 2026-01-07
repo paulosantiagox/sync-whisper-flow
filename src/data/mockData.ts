@@ -1,0 +1,290 @@
+import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog } from '@/types';
+
+export const users: User[] = [
+  {
+    id: '1',
+    name: 'Paulo Admin',
+    email: 'paulo@admin.com',
+    password: 'master123',
+    role: 'master',
+    photo: '',
+    status: 'active',
+    createdAt: '2024-01-01T10:00:00Z',
+    lastLogin: '2025-01-07T08:30:00Z'
+  },
+  {
+    id: '2',
+    name: 'João Silva',
+    email: 'joao@empresa.com',
+    password: 'usuario123',
+    role: 'user',
+    photo: '',
+    status: 'active',
+    createdAt: '2024-03-15T14:00:00Z',
+    lastLogin: '2025-01-06T16:45:00Z'
+  },
+  {
+    id: '3',
+    name: 'Maria Santos',
+    email: 'maria@agencia.com',
+    password: 'usuario123',
+    role: 'user',
+    photo: '',
+    status: 'active',
+    createdAt: '2024-06-20T09:30:00Z',
+    lastLogin: '2025-01-07T10:15:00Z'
+  },
+  {
+    id: '4',
+    name: 'Carlos Oliveira',
+    email: 'carlos@marketing.com',
+    password: 'usuario123',
+    role: 'user',
+    photo: '',
+    status: 'pending',
+    createdAt: '2025-01-05T11:00:00Z'
+  }
+];
+
+export const projects: Project[] = [
+  {
+    id: 'p1',
+    userId: '2',
+    name: 'E-commerce Principal',
+    description: 'Números de atendimento da loja online',
+    createdAt: '2024-04-01T10:00:00Z',
+    updatedAt: '2025-01-06T14:30:00Z'
+  },
+  {
+    id: 'p2',
+    userId: '2',
+    name: 'Suporte Técnico',
+    description: 'Linhas de suporte ao cliente',
+    createdAt: '2024-05-15T08:00:00Z',
+    updatedAt: '2025-01-05T16:00:00Z'
+  },
+  {
+    id: 'p3',
+    userId: '3',
+    name: 'Agência Digital',
+    description: 'Gerenciamento de clientes',
+    createdAt: '2024-07-01T09:00:00Z',
+    updatedAt: '2025-01-07T09:00:00Z'
+  },
+  {
+    id: 'p4',
+    userId: '3',
+    name: 'Lançamento Curso',
+    description: 'Campanha de lançamento digital',
+    createdAt: '2024-10-10T14:00:00Z',
+    updatedAt: '2025-01-04T11:00:00Z'
+  }
+];
+
+export const whatsappNumbers: WhatsAppNumber[] = [
+  {
+    id: 'wn1',
+    projectId: 'p1',
+    phoneNumberId: '123456789',
+    displayPhoneNumber: '+55 11 99999-1111',
+    verifiedName: 'Loja Online Oficial',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    accessToken: 'token_xxx',
+    wabaId: 'waba_001',
+    bmId: 'bm_001',
+    isVisible: true,
+    createdAt: '2024-04-02T10:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn2',
+    projectId: 'p1',
+    phoneNumberId: '123456790',
+    displayPhoneNumber: '+55 11 99999-2222',
+    verifiedName: 'Vendas Express',
+    qualityRating: 'MEDIUM',
+    messagingLimitTier: '250/dia',
+    accessToken: 'token_yyy',
+    wabaId: 'waba_001',
+    bmId: 'bm_001',
+    isVisible: true,
+    createdAt: '2024-04-05T11:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn3',
+    projectId: 'p1',
+    phoneNumberId: '123456791',
+    displayPhoneNumber: '+55 11 99999-3333',
+    verifiedName: 'SAC Loja',
+    qualityRating: 'LOW',
+    messagingLimitTier: '50/dia',
+    accessToken: 'token_zzz',
+    wabaId: 'waba_001',
+    bmId: 'bm_001',
+    isVisible: true,
+    createdAt: '2024-04-10T09:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn4',
+    projectId: 'p2',
+    phoneNumberId: '123456792',
+    displayPhoneNumber: '+55 11 98888-4444',
+    verifiedName: 'Suporte Técnico 24h',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    accessToken: 'token_aaa',
+    wabaId: 'waba_002',
+    bmId: 'bm_001',
+    isVisible: true,
+    createdAt: '2024-05-20T10:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn5',
+    projectId: 'p3',
+    phoneNumberId: '123456793',
+    displayPhoneNumber: '+55 21 97777-5555',
+    verifiedName: 'Agência Marketing Pro',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    accessToken: 'token_bbb',
+    wabaId: 'waba_003',
+    bmId: 'bm_002',
+    isVisible: true,
+    createdAt: '2024-07-05T14:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn6',
+    projectId: 'p3',
+    phoneNumberId: '123456794',
+    displayPhoneNumber: '+55 21 97777-6666',
+    verifiedName: 'Atendimento Clientes',
+    qualityRating: 'MEDIUM',
+    messagingLimitTier: '250/dia',
+    accessToken: 'token_ccc',
+    wabaId: 'waba_003',
+    bmId: 'bm_002',
+    isVisible: true,
+    createdAt: '2024-07-10T11:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  },
+  {
+    id: 'wn7',
+    projectId: 'p4',
+    phoneNumberId: '123456795',
+    displayPhoneNumber: '+55 21 96666-7777',
+    verifiedName: 'Curso Expert Digital',
+    qualityRating: 'HIGH',
+    messagingLimitTier: '1000/dia',
+    accessToken: 'token_ddd',
+    wabaId: 'waba_004',
+    bmId: 'bm_002',
+    isVisible: true,
+    createdAt: '2024-10-15T10:00:00Z',
+    lastChecked: '2025-01-07T06:00:00Z'
+  }
+];
+
+export const statusHistory: StatusHistory[] = [
+  {
+    id: 'sh1',
+    phoneNumberId: 'wn2',
+    qualityRating: 'MEDIUM',
+    messagingLimitTier: '250/dia',
+    previousQuality: 'HIGH',
+    changedAt: '2025-01-05T12:00:00Z',
+    expectedRecovery: '2025-01-12T12:00:00Z',
+    observation: 'Queda após campanha de Black Friday'
+  },
+  {
+    id: 'sh2',
+    phoneNumberId: 'wn3',
+    qualityRating: 'LOW',
+    messagingLimitTier: '50/dia',
+    previousQuality: 'MEDIUM',
+    changedAt: '2025-01-03T18:00:00Z',
+    expectedRecovery: '2025-01-10T18:00:00Z',
+    observation: 'Alta taxa de denúncias'
+  }
+];
+
+export const campaigns: Campaign[] = [
+  {
+    id: 'c1',
+    userId: '2',
+    name: 'Campanha Janeiro 2025',
+    description: 'Promoções de início de ano',
+    status: 'active',
+    createdAt: '2025-01-02T10:00:00Z'
+  },
+  {
+    id: 'c2',
+    userId: '3',
+    name: 'Lançamento Produto X',
+    description: 'Campanha de lançamento do novo produto',
+    status: 'active',
+    createdAt: '2024-12-15T14:00:00Z'
+  }
+];
+
+export const actionTypes: ActionType[] = [
+  { id: 'at1', campaignId: 'c1', name: 'Convite', color: '#3B82F6', isActive: true },
+  { id: 'at2', campaignId: 'c1', name: 'Lançamento', color: '#10B981', isActive: true },
+  { id: 'at3', campaignId: 'c1', name: 'Perpétuo', color: '#8B5CF6', isActive: true },
+  { id: 'at4', campaignId: 'c2', name: 'Aquecimento', color: '#F59E0B', isActive: true },
+  { id: 'at5', campaignId: 'c2', name: 'Carrinho Aberto', color: '#EF4444', isActive: true }
+];
+
+export const broadcasts: Broadcast[] = [
+  {
+    id: 'b1',
+    campaignId: 'c1',
+    date: '2025-01-05',
+    time: '14:30',
+    actionTypeId: 'at1',
+    phoneNumberId: 'wn1',
+    listName: 'Lista VIP Janeiro',
+    templateUsed: 'promo_janeiro_01',
+    contactCount: 500,
+    status: 'completed',
+    createdAt: '2025-01-05T14:30:00Z'
+  },
+  {
+    id: 'b2',
+    campaignId: 'c1',
+    date: '2025-01-06',
+    time: '10:00',
+    actionTypeId: 'at2',
+    phoneNumberId: 'wn1',
+    listName: 'Clientes Ativos',
+    templateUsed: 'lancamento_produto',
+    contactCount: 1200,
+    status: 'completed',
+    createdAt: '2025-01-06T10:00:00Z'
+  },
+  {
+    id: 'b3',
+    campaignId: 'c2',
+    date: '2025-01-07',
+    time: '09:00',
+    actionTypeId: 'at4',
+    phoneNumberId: 'wn5',
+    listName: 'Leads Quentes',
+    templateUsed: 'aquecimento_v2',
+    contactCount: 800,
+    status: 'scheduled',
+    createdAt: '2025-01-06T18:00:00Z'
+  }
+];
+
+export const activityLogs: ActivityLog[] = [
+  { id: 'al1', userId: '2', action: 'login', details: 'Login realizado com sucesso', timestamp: '2025-01-07T08:30:00Z' },
+  { id: 'al2', userId: '2', action: 'create_broadcast', details: 'Criou disparo para Lista VIP Janeiro', timestamp: '2025-01-05T14:25:00Z' },
+  { id: 'al3', userId: '3', action: 'add_number', details: 'Adicionou número +55 21 97777-6666', timestamp: '2025-01-04T11:00:00Z' },
+  { id: 'al4', userId: '1', action: 'approve_user', details: 'Aprovou usuário Carlos Oliveira', timestamp: '2025-01-05T12:00:00Z' },
+  { id: 'al5', userId: '3', action: 'login', details: 'Login realizado com sucesso', timestamp: '2025-01-07T10:15:00Z' }
+];
