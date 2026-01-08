@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole, useDeleteUser } from '@/hooks/useUsers';
+import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole } from '@/hooks/useUsers';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Switch } from '@/components/ui/switch';
 import { 
   Search, Check, X, Eye, MoreHorizontal, Users as UsersIcon, 
-  FolderKanban, Phone, Activity, Loader2, Shield, UserMinus, 
-  RefreshCw, Trash2 
+  FolderKanban, Phone, Activity, Loader2, Shield, UserMinus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -23,16 +23,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import UserDetailModal from '@/components/modals/UserDetailModal';
 import { User } from '@/types';
 
@@ -40,7 +30,6 @@ const UsersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users = [], isLoading } = useUsers();
   const { data: stats } = useUserStats();
@@ -48,7 +37,6 @@ const UsersPage = () => {
   const { data: numbers = [] } = useAllWhatsAppNumbers();
   const updateStatus = useUpdateUserStatus();
   const updateRole = useUpdateUserRole();
-  const deleteUser = useDeleteUser();
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -63,11 +51,9 @@ const UsersPage = () => {
     return { projects: userProjects.length, numbers: userNumbers.length };
   };
 
-  const handleDeleteConfirm = () => {
-    if (userToDelete) {
-      deleteUser.mutate(userToDelete.id);
-      setUserToDelete(null);
-    }
+  const handleToggleStatus = (user: User) => {
+    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    updateStatus.mutate({ userId: user.id, status: newStatus });
   };
 
   if (isLoading) {
@@ -104,7 +90,7 @@ const UsersPage = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Usuário</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="text-center">Ativo</TableHead>
               <TableHead className="text-center">Projetos</TableHead>
               <TableHead className="text-center">Números</TableHead>
               <TableHead>Cadastro</TableHead>
@@ -114,6 +100,7 @@ const UsersPage = () => {
           <TableBody>
             {filteredUsers.map((user) => {
               const userStats = getUserStats(user.id);
+              const isActive = user.status === 'active';
               return (
                 <TableRow key={user.id}>
                   <TableCell>
@@ -121,13 +108,20 @@ const UsersPage = () => {
                       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-sm font-medium text-primary">{user.name.charAt(0).toUpperCase()}</span>
                       </div>
-                      <div><p className="font-medium">{user.name}</p><p className="text-sm text-muted-foreground">{user.email}</p></div>
+                      <div>
+                        <p className="font-medium">{user.name}</p>
+                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant={user.status === 'active' ? 'default' : user.status === 'pending' ? 'secondary' : 'outline'} className={user.status === 'active' ? 'bg-success' : user.status === 'pending' ? 'bg-warning text-warning-foreground' : ''}>
-                      {user.status === 'active' ? 'Ativo' : user.status === 'pending' ? 'Pendente' : 'Inativo'}
-                    </Badge>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center">
+                      <Switch
+                        checked={isActive}
+                        onCheckedChange={() => handleToggleStatus(user)}
+                        className={isActive ? 'data-[state=checked]:bg-success' : 'data-[state=unchecked]:bg-destructive'}
+                      />
+                    </div>
                   </TableCell>
                   <TableCell className="text-center"><span className="flex items-center justify-center gap-1"><FolderKanban className="w-4 h-4 text-muted-foreground" />{userStats.projects}</span></TableCell>
                   <TableCell className="text-center"><span className="flex items-center justify-center gap-1"><Phone className="w-4 h-4 text-muted-foreground" />{userStats.numbers}</span></TableCell>
@@ -144,36 +138,6 @@ const UsersPage = () => {
                           <Eye className="mr-2 h-4 w-4" />
                           Ver detalhes
                         </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
-                        
-                        {user.status === 'pending' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'active' })}
-                            className="text-success focus:text-success"
-                          >
-                            <Check className="mr-2 h-4 w-4" />
-                            Aprovar
-                          </DropdownMenuItem>
-                        )}
-                        
-                        {user.status === 'active' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'inactive' })}
-                          >
-                            <X className="mr-2 h-4 w-4" />
-                            Desativar
-                          </DropdownMenuItem>
-                        )}
-                        
-                        {user.status === 'inactive' && (
-                          <DropdownMenuItem 
-                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'active' })}
-                          >
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Reativar
-                          </DropdownMenuItem>
-                        )}
                         
                         <DropdownMenuSeparator />
                         
@@ -194,16 +158,6 @@ const UsersPage = () => {
                             Rebaixar a Usuário
                           </DropdownMenuItem>
                         )}
-                        
-                        <DropdownMenuSeparator />
-                        
-                        <DropdownMenuItem 
-                          onClick={() => setUserToDelete(user)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -222,24 +176,6 @@ const UsersPage = () => {
         projectsCount={selectedUser ? getUserStats(selectedUser.id).projects : 0}
         numbersCount={selectedUser ? getUserStats(selectedUser.id).numbers : 0}
       />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja excluir o usuário <strong>{userToDelete?.name}</strong>? Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </DashboardLayout>
   );
 };
