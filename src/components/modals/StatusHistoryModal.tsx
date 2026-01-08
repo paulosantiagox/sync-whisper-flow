@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { History, Download, TrendingUp, TrendingDown, Clock, Calendar, Phone } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { History, Download, TrendingUp, TrendingDown, Clock, Calendar, Phone, AlertCircle, XCircle } from 'lucide-react';
 import { format, subDays, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { statusHistory as allStatusHistory } from '@/data/mockData';
+import { statusHistory as allStatusHistory, getNumberErrors } from '@/data/mockData';
 
 interface StatusHistoryModalProps {
   number: WhatsAppNumber | null;
@@ -29,6 +30,11 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
       .filter(h => isAfter(new Date(h.changedAt), filterDate))
       .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime());
   }, [number, periodFilter]);
+
+  const errorState = useMemo(() => {
+    if (!number) return null;
+    return getNumberErrors(number.id);
+  }, [number]);
 
   const stats = useMemo(() => {
     if (!number) return null;
@@ -112,125 +118,211 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Phone className="w-5 h-5 text-primary" />
           </div>
-          <div>
+          <div className="flex-1">
             {number.customName && (
               <p className="text-sm font-semibold">{number.customName}</p>
             )}
             <p className="text-sm text-muted-foreground">{number.verifiedName} • {number.displayPhoneNumber}</p>
           </div>
-        </div>
-
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground mb-1">Tendência</div>
-              <div className="flex items-center gap-2">
-                {stats.trend > 0 ? (
-                  <>
-                    <TrendingUp className="w-5 h-5 text-success" />
-                    <span className="font-semibold text-success">Melhorando</span>
-                  </>
-                ) : stats.trend < 0 ? (
-                  <>
-                    <TrendingDown className="w-5 h-5 text-destructive" />
-                    <span className="font-semibold text-destructive">Piorando</span>
-                  </>
-                ) : (
-                  <>
-                    <Clock className="w-5 h-5 text-muted-foreground" />
-                    <span className="font-semibold">Estável</span>
-                  </>
-                )}
-              </div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground mb-1">Tempo em Alta</div>
-              <div className="font-semibold text-success">{stats.highCount} registros</div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground mb-1">Última Queda</div>
-              <div className="font-semibold">
-                {stats.lastDrop 
-                  ? format(stats.lastDrop, "dd/MM/yyyy", { locale: ptBR })
-                  : 'Nenhuma'
-                }
-              </div>
-            </Card>
-            <Card className="p-3">
-              <div className="text-xs text-muted-foreground mb-1">Status Atual</div>
-              {getStatusBadge(number.qualityRating)}
-            </Card>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex items-center justify-between gap-4">
-          <Select value={periodFilter} onValueChange={setPeriodFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Calendar className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 dias</SelectItem>
-              <SelectItem value="30">Últimos 30 dias</SelectItem>
-              <SelectItem value="90">Últimos 90 dias</SelectItem>
-              <SelectItem value="365">Último ano</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar CSV
-          </Button>
-        </div>
-
-        {/* History Table */}
-        <div className="flex-1 overflow-auto rounded-lg border">
-          {numberHistory.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data/Hora</TableHead>
-                  <TableHead>Status Anterior</TableHead>
-                  <TableHead>Status Atual</TableHead>
-                  <TableHead>Limite</TableHead>
-                  <TableHead>Prev. Recuperação</TableHead>
-                  <TableHead>Observação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {numberHistory.map((entry) => (
-                  <TableRow key={entry.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(entry.changedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                    </TableCell>
-                    <TableCell>
-                      {entry.previousQuality ? getStatusBadge(entry.previousQuality) : '-'}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(entry.qualityRating)}</TableCell>
-                    <TableCell className="text-muted-foreground">{entry.messagingLimitTier}</TableCell>
-                    <TableCell>
-                      {entry.expectedRecovery ? (
-                        <span className="text-warning">
-                          {format(new Date(entry.expectedRecovery), "dd/MM/yyyy", { locale: ptBR })}
-                        </span>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                      {entry.observation || '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <div className="p-8 text-center">
-              <History className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-muted-foreground">Nenhum histórico encontrado para o período selecionado</p>
+          {errorState && errorState.errorCount > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-destructive/10 text-destructive">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-xs font-medium">{errorState.errorCount} erro(s)</span>
             </div>
           )}
         </div>
+
+        <Tabs defaultValue="history" className="flex-1 flex flex-col overflow-hidden">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="w-4 h-4" />
+              Histórico de Status
+            </TabsTrigger>
+            <TabsTrigger value="errors" className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              Erros de Atualização
+              {errorState && errorState.errorCount > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full">
+                  {errorState.errorCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="history" className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
+            {/* Stats Cards */}
+            {stats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Tendência</div>
+                  <div className="flex items-center gap-2">
+                    {stats.trend > 0 ? (
+                      <>
+                        <TrendingUp className="w-5 h-5 text-success" />
+                        <span className="font-semibold text-success">Melhorando</span>
+                      </>
+                    ) : stats.trend < 0 ? (
+                      <>
+                        <TrendingDown className="w-5 h-5 text-destructive" />
+                        <span className="font-semibold text-destructive">Piorando</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-semibold">Estável</span>
+                      </>
+                    )}
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Tempo em Alta</div>
+                  <div className="font-semibold text-success">{stats.highCount} registros</div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Última Queda</div>
+                  <div className="font-semibold">
+                    {stats.lastDrop 
+                      ? format(stats.lastDrop, "dd/MM/yyyy", { locale: ptBR })
+                      : 'Nenhuma'
+                    }
+                  </div>
+                </Card>
+                <Card className="p-3">
+                  <div className="text-xs text-muted-foreground mb-1">Status Atual</div>
+                  {getStatusBadge(number.qualityRating)}
+                </Card>
+              </div>
+            )}
+
+            {/* Filters */}
+            <div className="flex items-center justify-between gap-4">
+              <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                <SelectTrigger className="w-[180px]">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Últimos 7 dias</SelectItem>
+                  <SelectItem value="30">Últimos 30 dias</SelectItem>
+                  <SelectItem value="90">Últimos 90 dias</SelectItem>
+                  <SelectItem value="365">Último ano</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Exportar CSV
+              </Button>
+            </div>
+
+            {/* History Table */}
+            <div className="flex-1 overflow-auto rounded-lg border">
+              {numberHistory.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data/Hora</TableHead>
+                      <TableHead>Status Anterior</TableHead>
+                      <TableHead>Status Atual</TableHead>
+                      <TableHead>Limite</TableHead>
+                      <TableHead>Prev. Recuperação</TableHead>
+                      <TableHead>Observação</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {numberHistory.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell className="font-medium">
+                          {format(new Date(entry.changedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell>
+                          {entry.previousQuality ? getStatusBadge(entry.previousQuality) : '-'}
+                        </TableCell>
+                        <TableCell>{getStatusBadge(entry.qualityRating)}</TableCell>
+                        <TableCell className="text-muted-foreground">{entry.messagingLimitTier}</TableCell>
+                        <TableCell>
+                          {entry.expectedRecovery ? (
+                            <span className="text-warning">
+                              {format(new Date(entry.expectedRecovery), "dd/MM/yyyy", { locale: ptBR })}
+                            </span>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                          {entry.observation || '-'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-8 text-center">
+                  <History className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-muted-foreground">Nenhum histórico encontrado para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="errors" className="flex-1 overflow-auto mt-4">
+            {errorState && errorState.attempts.length > 0 ? (
+              <div className="space-y-4">
+                {/* Error Summary Card */}
+                <Card className="p-4 border-destructive/30 bg-destructive/5">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-destructive/20 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-destructive">Erros de Atualização</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Este número teve {errorState.errorCount} tentativa(s) de atualização com erro.
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        <strong>Último erro:</strong> {errorState.lastError}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Error Attempts Table */}
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data/Hora</TableHead>
+                        <TableHead>Mensagem de Erro</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {errorState.attempts
+                        .sort((a, b) => new Date(b.attemptedAt).getTime() - new Date(a.attemptedAt).getTime())
+                        .map((attempt) => (
+                          <TableRow key={attempt.id}>
+                            <TableCell className="font-medium whitespace-nowrap">
+                              {format(new Date(attempt.attemptedAt), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}
+                            </TableCell>
+                            <TableCell className="text-destructive text-sm">
+                              {attempt.errorMessage}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-success" />
+                </div>
+                <h3 className="font-semibold text-lg mb-1">Sem erros registrados</h3>
+                <p className="text-muted-foreground">
+                  Todas as atualizações deste número foram realizadas com sucesso.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

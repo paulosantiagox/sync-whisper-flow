@@ -1,4 +1,4 @@
-import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager } from '@/types';
+import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager, NumberErrorLog, NumberErrorState } from '@/types';
 
 export const users: User[] = [
   {
@@ -454,4 +454,42 @@ export const deleteBusinessManager = (id: string) => {
 export const addWhatsAppNumber = (number: WhatsAppNumber) => {
   whatsappNumbers = [...whatsappNumbers, number];
   return number;
+};
+
+// Error tracking
+export let numberErrors: NumberErrorState[] = [];
+
+export const addNumberError = (phoneNumberId: string, errorMessage: string) => {
+  const existingError = numberErrors.find(e => e.phoneNumberId === phoneNumberId);
+  const errorLog: NumberErrorLog = {
+    id: `err${Date.now()}`,
+    phoneNumberId,
+    errorMessage,
+    attemptedAt: new Date().toISOString(),
+  };
+  
+  if (existingError) {
+    existingError.errorCount++;
+    existingError.lastError = errorMessage;
+    existingError.attempts.push(errorLog);
+  } else {
+    numberErrors.push({
+      phoneNumberId,
+      errorCount: 1,
+      lastError: errorMessage,
+      attempts: [errorLog],
+    });
+  }
+};
+
+export const clearNumberErrors = (phoneNumberId: string) => {
+  numberErrors = numberErrors.filter(e => e.phoneNumberId !== phoneNumberId);
+};
+
+export const getNumberErrors = (phoneNumberId: string): NumberErrorState | undefined => {
+  return numberErrors.find(e => e.phoneNumberId === phoneNumberId);
+};
+
+export const getAllNumberErrors = (): NumberErrorState[] => {
+  return numberErrors;
 };

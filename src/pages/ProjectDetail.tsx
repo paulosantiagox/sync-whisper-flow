@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import EditNumberModal from '@/components/modals/EditNumberModal';
@@ -7,8 +7,14 @@ import BMModal from '@/components/modals/BMModal';
 import AddNumberFromMetaModal from '@/components/modals/AddNumberFromMetaModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import QualityBadge from '@/components/dashboard/QualityBadge';
-import { projects, whatsappNumbers, businessManagers, updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, addWhatsAppNumber } from '@/data/mockData';
-import { WhatsAppNumber, BusinessManager } from '@/types';
+import ErrorBadge from '@/components/dashboard/ErrorBadge';
+import { 
+  projects, whatsappNumbers, businessManagers, statusHistory as allStatusHistory,
+  updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, 
+  addWhatsAppNumber, addStatusHistory, addNumberError, clearNumberErrors, getNumberErrors, getAllNumberErrors
+} from '@/data/mockData';
+import { WhatsAppNumber, BusinessManager, StatusHistory } from '@/types';
+import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -97,21 +103,92 @@ const ProjectDetail = () => {
     return acc + limit;
   }, 0);
 
-  const handleUpdateAllStatus = async () => {
-    setIsUpdating(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  const handleUpdateAllStatus = useCallback(async () => {
+    if (numbers.length === 0) return;
     
-    numbers.forEach(n => {
-      updateWhatsAppNumber(n.id, { lastChecked: new Date().toISOString() });
-    });
+    setIsUpdating(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const number of numbers) {
+      // Find BM for this number to get access token
+      const bm = businessManagers.find(b => b.id === number.businessManagerId);
+      
+      if (!bm || !number.phoneNumberId) {
+        // Skip numbers without BM or phoneNumberId
+        continue;
+      }
+
+      try {
+        // Fetch real status from Meta API
+        const detail = await fetchPhoneNumberDetail(number.phoneNumberId, bm.accessToken);
+        
+        const newQuality = mapMetaQuality(detail.quality_rating);
+        const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
+        
+        // Check if status changed
+        const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
+        
+        // Create history entry
+        const historyEntry: StatusHistory = {
+          id: `sh${Date.now()}_${number.id}`,
+          phoneNumberId: number.id,
+          qualityRating: newQuality,
+          messagingLimitTier: newLimit,
+          previousQuality: hasChanged ? number.qualityRating : undefined,
+          changedAt: new Date().toISOString(),
+          observation: hasChanged 
+            ? `Status alterado de ${number.qualityRating} para ${newQuality}`
+            : 'Verificação automática - sem alterações',
+        };
+        
+        addStatusHistory(historyEntry);
+        
+        // Update number data
+        updateWhatsAppNumber(number.id, {
+          qualityRating: newQuality,
+          messagingLimitTier: newLimit,
+          verifiedName: detail.verified_name,
+          displayPhoneNumber: detail.display_phone_number,
+          lastChecked: new Date().toISOString(),
+        });
+        
+        // Clear any previous errors for this number
+        clearNumberErrors(number.id);
+        successCount++;
+        
+      } catch (error) {
+        console.error(`Error updating number ${number.displayPhoneNumber}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+        
+        // Log the error
+        addNumberError(number.id, errorMessage);
+        
+        // Still update lastChecked to track attempt
+        updateWhatsAppNumber(number.id, {
+          lastChecked: new Date().toISOString(),
+        });
+        
+        errorCount++;
+      }
+    }
     
     setIsUpdating(false);
     forceUpdate({});
-    toast({
-      title: "Status atualizado!",
-      description: `${numbers.length} números foram verificados com sucesso.`,
-    });
-  };
+    
+    if (errorCount > 0) {
+      toast({
+        title: "Atualização concluída com erros",
+        description: `${successCount} números atualizados, ${errorCount} com erro.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Status atualizado!",
+        description: `${successCount} números foram verificados com sucesso.`,
+      });
+    }
+  }, [numbers, toast]);
 
   const handleSaveNumber = (id: string, data: Partial<WhatsAppNumber>) => {
     updateWhatsAppNumber(id, data);
@@ -173,15 +250,25 @@ const ProjectDetail = () => {
 
   const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => {
     const bm = businessManagers.find(b => b.id === number.businessManagerId);
+    const errorState = getNumberErrors(number.id);
+    
     return (
       <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
         <TableCell>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-              {number.photo ? (
-                <img src={number.photo} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <Phone className="w-5 h-5 text-muted-foreground" />
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                {number.photo ? (
+                  <img src={number.photo} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <Phone className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              {/* Error Badge */}
+              {errorState && errorState.errorCount > 0 && (
+                <div className="absolute -top-1 -right-1">
+                  <ErrorBadge errorState={errorState} />
+                </div>
               )}
             </div>
             <div>
