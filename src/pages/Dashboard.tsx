@@ -125,9 +125,9 @@ const MasterDashboard = () => {
                       <p className="text-sm font-medium truncate">
                         {change.number?.customName || change.number?.verifiedName}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {change.previousQuality} → {change.newQuality} • {change.project?.name}
-                      </p>
+                    <p className="text-xs text-muted-foreground">
+                      {change.previousQuality === 'HIGH' ? 'Alta' : change.previousQuality === 'MEDIUM' ? 'Média' : 'Baixa'} → {change.newQuality === 'HIGH' ? 'Alta' : change.newQuality === 'MEDIUM' ? 'Média' : 'Baixa'} • {change.project?.name}
+                    </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
@@ -235,7 +235,7 @@ const UserDashboard = () => {
                       {change.number?.customName || change.number?.verifiedName}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {change.previousQuality} → {change.newQuality} • {change.project?.name}
+                      {change.previousQuality === 'HIGH' ? 'Alta' : change.previousQuality === 'MEDIUM' ? 'Média' : 'Baixa'} → {change.newQuality === 'HIGH' ? 'Alta' : change.newQuality === 'MEDIUM' ? 'Média' : 'Baixa'} • {change.project?.name}
                     </p>
                   </div>
                   <span className="text-xs text-muted-foreground">
