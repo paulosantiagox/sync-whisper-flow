@@ -87,6 +87,18 @@ export interface NumberErrorState {
   hidden?: boolean;
 }
 
+// Status change notification for numbers
+export interface StatusChangeNotification {
+  id: string;
+  phoneNumberId: string;
+  projectId: string;
+  previousQuality: QualityRating;
+  newQuality: QualityRating;
+  direction: 'up' | 'down';
+  changedAt: string;
+  read?: boolean;
+}
+
 // Campaign types
 export interface Campaign {
   id: string;

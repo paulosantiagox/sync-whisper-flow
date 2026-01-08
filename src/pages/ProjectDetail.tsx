@@ -12,9 +12,10 @@ import {
   projects, whatsappNumbers, businessManagers, statusHistory as allStatusHistory,
   updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, 
   addWhatsAppNumber, addStatusHistory, updateStatusHistory, getLatestStatusHistory,
-  addNumberError, clearNumberErrors, hideNumberErrors, getNumberErrors, getAllNumberErrors
+  addNumberError, clearNumberErrors, hideNumberErrors, getNumberErrors, getAllNumberErrors,
+  getNumberNotifications, clearNumberNotifications, addStatusChangeNotification
 } from '@/data/mockData';
-import { WhatsAppNumber, BusinessManager, StatusHistory } from '@/types';
+import { WhatsAppNumber, BusinessManager, StatusHistory, StatusChangeNotification } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,8 +26,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, 
-  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, BellOff, Eraser
+  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, BellOff, Eraser, TrendingUp, TrendingDown, Bell
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -135,6 +137,22 @@ const ProjectDetail = () => {
         const latestHistory = getLatestStatusHistory(number.id);
         
         if (hasChanged) {
+          // Determine direction of change
+          const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+          const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
+          
+          // Create status change notification
+          const notification: StatusChangeNotification = {
+            id: `scn${Date.now()}_${number.id}`,
+            phoneNumberId: number.id,
+            projectId: id || '',
+            previousQuality: number.qualityRating,
+            newQuality: newQuality,
+            direction: direction,
+            changedAt: new Date().toISOString(),
+          };
+          addStatusChangeNotification(notification);
+          
           // Status changed - create new history entry
           const historyEntry: StatusHistory = {
             id: `sh${Date.now()}_${number.id}`,
@@ -242,6 +260,12 @@ const ProjectDetail = () => {
     toast({ title: "Erros apagados", description: "Todos os registros de erro foram removidos." });
   };
 
+  const handleClearNumberNotifications = (numberId: string) => {
+    clearNumberNotifications(numberId);
+    forceUpdate({});
+    toast({ title: "Notificações limpas", description: "As notificações de mudança de status foram removidas." });
+  };
+
   const handleSaveBM = (bm: BusinessManager) => {
     if (editBM) {
       updateBusinessManager(bm.id, bm);
@@ -283,113 +307,159 @@ const ProjectDetail = () => {
   const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => {
     const bm = businessManagers.find(b => b.id === number.businessManagerId);
     const errorState = getNumberErrors(number.id);
+    const notifications = getNumberNotifications(number.id);
+    const hasStatusNotification = notifications.length > 0;
+    const latestNotification = notifications[0];
     
     return (
-      <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
-        <TableCell>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                {number.photo ? (
-                  <img src={number.photo} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Phone className="w-5 h-5 text-muted-foreground" />
+      <TooltipProvider>
+        <TableRow key={number.id} className={isInactive ? 'opacity-60' : ''}>
+          <TableCell>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                  {number.photo ? (
+                    <img src={number.photo} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <Phone className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+                {/* Error Badge */}
+                {errorState && errorState.errorCount > 0 && !errorState.hidden && (
+                  <div className="absolute -top-1 -right-1">
+                    <ErrorBadge errorState={errorState} />
+                  </div>
+                )}
+                {/* Status Change Notification Badge */}
+                {hasStatusNotification && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={`absolute -top-1 -left-1 w-5 h-5 rounded-full flex items-center justify-center ${
+                        latestNotification.direction === 'up' 
+                          ? 'bg-success text-success-foreground' 
+                          : 'bg-destructive text-destructive-foreground'
+                      }`}>
+                        {latestNotification.direction === 'up' 
+                          ? <TrendingUp className="w-3 h-3" /> 
+                          : <TrendingDown className="w-3 h-3" />
+                        }
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-popover text-popover-foreground">
+                      <p>Status alterado: {latestNotification.previousQuality} → {latestNotification.newQuality}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
-              {/* Error Badge */}
-              {errorState && errorState.errorCount > 0 && !errorState.hidden && (
-                <div className="absolute -top-1 -right-1">
-                  <ErrorBadge errorState={errorState} />
-                </div>
-              )}
-            </div>
-            <div>
-              {number.customName && (
-                <p className="font-medium text-sm">{number.customName}</p>
-              )}
-              <p className={`${number.customName ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}`}>
-                {number.verifiedName}
-              </p>
-              <p className="text-xs text-muted-foreground">{number.displayPhoneNumber}</p>
-            </div>
-          </div>
-        </TableCell>
-        <TableCell>
-          <QualityBadge rating={number.qualityRating} />
-        </TableCell>
-        <TableCell>
-          <span className="text-sm">{number.messagingLimitTier}/dia</span>
-        </TableCell>
-        <TableCell>
-          {bm ? (
-            <div className="text-xs">
-              <p className="font-medium text-foreground">{bm.mainBmName}</p>
-              <p className="text-muted-foreground">ID: {bm.mainBmId}</p>
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">-</span>
-          )}
-        </TableCell>
-        <TableCell>
-          {number.observation ? (
-            <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">{number.observation}</span>
-          ) : (
-            <span className="text-xs text-muted-foreground">-</span>
-          )}
-        </TableCell>
-        <TableCell>
-          <span className="text-xs text-muted-foreground">
-            {format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}
-          </span>
-        </TableCell>
-        <TableCell>
-          <Switch
-            checked={number.isVisible}
-            onCheckedChange={(checked) => handleToggleVisibility(number, checked)}
-          />
-        </TableCell>
-        <TableCell>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryNumber(number)}>
-              <History className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
-              <Edit2 className="w-4 h-4" />
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {errorState && errorState.errorCount > 0 && (
-                  <>
-                    {!errorState.hidden && (
-                      <DropdownMenuItem onClick={() => handleHideErrorNotification(number.id)}>
-                        <BellOff className="w-4 h-4 mr-2" />
-                        Ocultar notificação de erro
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleClearAllErrors(number.id)}>
-                      <Eraser className="w-4 h-4 mr-2" />
-                      Apagar todos os erros
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
+              <div>
+                {number.customName && (
+                  <p className="font-medium text-sm">{number.customName}</p>
                 )}
-                <DropdownMenuItem 
-                  className="text-destructive focus:text-destructive" 
-                  onClick={() => setDeleteNumber(number)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Excluir número
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </TableCell>
-      </TableRow>
+                <p className={`${number.customName ? 'text-xs text-muted-foreground' : 'font-medium text-sm'}`}>
+                  {number.verifiedName}
+                </p>
+                <p className="text-xs text-muted-foreground">{number.displayPhoneNumber}</p>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <QualityBadge rating={number.qualityRating} />
+              {hasStatusNotification && (
+                <span className={`text-xs font-medium ${
+                  latestNotification.direction === 'up' ? 'text-success' : 'text-destructive'
+                }`}>
+                  {latestNotification.direction === 'up' ? '↑' : '↓'}
+                </span>
+              )}
+            </div>
+          </TableCell>
+          <TableCell>
+            <span className="text-sm">{number.messagingLimitTier}/dia</span>
+          </TableCell>
+          <TableCell>
+            {bm ? (
+              <div className="text-xs">
+                <p className="font-medium text-foreground">{bm.mainBmName}</p>
+                <p className="text-muted-foreground">ID: {bm.mainBmId}</p>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">-</span>
+            )}
+          </TableCell>
+          <TableCell>
+            {number.observation ? (
+              <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">{number.observation}</span>
+            ) : (
+              <span className="text-xs text-muted-foreground">-</span>
+            )}
+          </TableCell>
+          <TableCell>
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}
+            </span>
+          </TableCell>
+          <TableCell>
+            <Switch
+              checked={number.isVisible}
+              onCheckedChange={(checked) => handleToggleVisibility(number, checked)}
+            />
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryNumber(number)}>
+                <History className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
+                <Edit2 className="w-4 h-4" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 relative">
+                    <MoreVertical className="w-4 h-4" />
+                    {hasStatusNotification && (
+                      <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-warning" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover">
+                  {hasStatusNotification && (
+                    <>
+                      <DropdownMenuItem onClick={() => handleClearNumberNotifications(number.id)}>
+                        <Bell className="w-4 h-4 mr-2" />
+                        Limpar notificações
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  {errorState && errorState.errorCount > 0 && (
+                    <>
+                      {!errorState.hidden && (
+                        <DropdownMenuItem onClick={() => handleHideErrorNotification(number.id)}>
+                          <BellOff className="w-4 h-4 mr-2" />
+                          Ocultar notificação de erro
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => handleClearAllErrors(number.id)}>
+                        <Eraser className="w-4 h-4 mr-2" />
+                        Apagar todos os erros
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive" 
+                    onClick={() => setDeleteNumber(number)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Excluir número
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </TableCell>
+        </TableRow>
+      </TooltipProvider>
     );
   };
 

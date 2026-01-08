@@ -1,4 +1,4 @@
-import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager, NumberErrorLog, NumberErrorState, CampaignShortcut } from '@/types';
+import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager, NumberErrorLog, NumberErrorState, CampaignShortcut, StatusChangeNotification } from '@/types';
 
 export const users: User[] = [
   {
@@ -582,4 +582,70 @@ export const getNumberErrors = (phoneNumberId: string): NumberErrorState | undef
 
 export const getAllNumberErrors = (): NumberErrorState[] => {
   return numberErrors;
+};
+
+// Status change notifications
+export let statusChangeNotifications: StatusChangeNotification[] = [
+  {
+    id: 'scn1',
+    phoneNumberId: 'wn2',
+    projectId: 'p1',
+    previousQuality: 'HIGH',
+    newQuality: 'MEDIUM',
+    direction: 'down',
+    changedAt: '2025-01-05T12:00:00Z',
+  },
+  {
+    id: 'scn2',
+    phoneNumberId: 'wn3',
+    projectId: 'p1',
+    previousQuality: 'MEDIUM',
+    newQuality: 'LOW',
+    direction: 'down',
+    changedAt: '2025-01-03T18:00:00Z',
+  },
+  {
+    id: 'scn3',
+    phoneNumberId: 'wn1',
+    projectId: 'p1',
+    previousQuality: 'MEDIUM',
+    newQuality: 'HIGH',
+    direction: 'up',
+    changedAt: '2025-01-05T06:00:00Z',
+  }
+];
+
+export const addStatusChangeNotification = (notification: StatusChangeNotification) => {
+  statusChangeNotifications = [notification, ...statusChangeNotifications];
+  return notification;
+};
+
+export const getStatusChangeNotifications = (projectId?: string): StatusChangeNotification[] => {
+  if (projectId) {
+    return statusChangeNotifications.filter(n => n.projectId === projectId);
+  }
+  return statusChangeNotifications;
+};
+
+export const getUnreadStatusChangeNotifications = (projectId?: string): StatusChangeNotification[] => {
+  const notifications = projectId 
+    ? statusChangeNotifications.filter(n => n.projectId === projectId)
+    : statusChangeNotifications;
+  return notifications.filter(n => !n.read);
+};
+
+export const markNotificationAsRead = (id: string) => {
+  statusChangeNotifications = statusChangeNotifications.map(n =>
+    n.id === id ? { ...n, read: true } : n
+  );
+};
+
+export const clearNumberNotifications = (phoneNumberId: string) => {
+  statusChangeNotifications = statusChangeNotifications.map(n =>
+    n.phoneNumberId === phoneNumberId ? { ...n, read: true } : n
+  );
+};
+
+export const getNumberNotifications = (phoneNumberId: string): StatusChangeNotification[] => {
+  return statusChangeNotifications.filter(n => n.phoneNumberId === phoneNumberId && !n.read);
 };
