@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -9,10 +10,19 @@ import {
   Settings,
   LogOut,
   MessageSquare,
-  ChevronRight
+  ChevronRight,
+  ChevronLeft,
+  PanelLeftClose,
+  PanelLeft
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
-const Sidebar = () => {
+interface SidebarProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const { user, logout, isMaster } = useAuth();
   const location = useLocation();
 
@@ -33,84 +43,176 @@ const Sidebar = () => {
   const isActive = (href: string) => location.pathname === href;
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col z-50">
-      {/* Logo */}
-      <div className="p-6 border-b border-sidebar-border">
-        <Link to="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-            <MessageSquare className="w-5 h-5 text-primary-foreground" />
-          </div>
-          <div>
-            <h1 className="font-bold text-sidebar-foreground">WABA Manager</h1>
-            <p className="text-xs text-sidebar-foreground/60">API Manager</p>
-          </div>
-        </Link>
-      </div>
+    <TooltipProvider delayDuration={0}>
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 h-screen bg-sidebar flex flex-col z-50 transition-all duration-300",
+          collapsed ? "w-16" : "w-64"
+        )}
+      >
+        {/* Logo */}
+        <div className="p-4 border-b border-sidebar-border">
+          <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
+              <MessageSquare className="w-5 h-5 text-primary-foreground" />
+            </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <h1 className="font-bold text-sidebar-foreground">WABA Manager</h1>
+                <p className="text-xs text-sidebar-foreground/60">API Manager</p>
+              </div>
+            )}
+          </Link>
+        </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.href);
-          
-          return (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
-                active
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <Icon className="w-5 h-5" />
-              <span className="font-medium text-sm">{item.label}</span>
-              {active && <ChevronRight className="w-4 h-4 ml-auto" />}
-            </Link>
-          );
-        })}
-      </nav>
+        {/* Toggle Button */}
+        <button
+          onClick={onToggle}
+          className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center shadow-md hover:bg-primary transition-colors"
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
 
-      {/* User profile & logout */}
-      <div className="p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-3 mb-3 px-2">
-          {user?.photo ? (
-            <img 
-              src={user.photo} 
-              alt={user.name} 
-              className="w-9 h-9 rounded-full object-cover"
-            />
+        {/* Navigation */}
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+            
+            const linkContent = (
+              <Link
+                key={item.href}
+                to={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
+                  active
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",
+                  collapsed && "justify-center px-2"
+                )}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && (
+                  <>
+                    <span className="font-medium text-sm">{item.label}</span>
+                    {active && <ChevronRight className="w-4 h-4 ml-auto" />}
+                  </>
+                )}
+              </Link>
+            );
+
+            if (collapsed) {
+              return (
+                <Tooltip key={item.href}>
+                  <TooltipTrigger asChild>
+                    {linkContent}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                    {item.label}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return linkContent;
+          })}
+        </nav>
+
+        {/* User profile & logout */}
+        <div className="p-2 border-t border-sidebar-border">
+          {!collapsed ? (
+            <>
+              <div className="flex items-center gap-3 mb-3 px-2">
+                {user?.photo ? (
+                  <img 
+                    src={user.photo} 
+                    alt={user.name} 
+                    className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-medium text-sidebar-foreground">
+                      {user?.name?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name}</p>
+                  <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role}</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Link
+                  to="/settings"
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors text-sm"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>Ajustes</span>
+                </Link>
+                <button
+                  onClick={logout}
+                  className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors text-sm"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            </>
           ) : (
-            <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center">
-              <span className="text-sm font-medium text-sidebar-foreground">
-                {user?.name?.charAt(0).toUpperCase()}
-              </span>
+            <div className="flex flex-col items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {user?.photo ? (
+                    <img 
+                      src={user.photo} 
+                      alt={user.name} 
+                      className="w-9 h-9 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-sidebar-accent flex items-center justify-center">
+                      <span className="text-sm font-medium text-sidebar-foreground">
+                        {user?.name?.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                  {user?.name}
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    to="/settings"
+                    className="flex items-center justify-center p-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                  Ajustes
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={logout}
+                    className="flex items-center justify-center p-2 rounded-lg text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                  Sair
+                </TooltipContent>
+              </Tooltip>
             </div>
           )}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{user?.name}</p>
-            <p className="text-xs text-sidebar-foreground/60 capitalize">{user?.role}</p>
-          </div>
         </div>
-        
-        <div className="flex gap-2">
-          <Link
-            to="/settings"
-            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors text-sm"
-          >
-            <Settings className="w-4 h-4" />
-            <span>Ajustes</span>
-          </Link>
-          <button
-            onClick={logout}
-            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sidebar-foreground/70 hover:text-destructive hover:bg-destructive/10 transition-colors text-sm"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-    </aside>
+      </aside>
+    </TooltipProvider>
   );
 };
 
