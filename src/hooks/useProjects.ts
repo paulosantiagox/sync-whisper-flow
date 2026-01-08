@@ -5,22 +5,28 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export function useProjects() {
-  const { user } = useAuth();
+  const { user, isMaster } = useAuth();
 
   return useQuery({
-    queryKey: ['projects', user?.id],
+    queryKey: ['projects', user?.id, isMaster],
     queryFn: async () => {
       if (!user) return [];
       
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      // If not master, filter by user_id
+      if (!isMaster) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
-      return data.map((p): Project => ({
+      return (data || []).map((p): Project => ({
         id: p.id,
         userId: p.user_id,
         name: p.name,
