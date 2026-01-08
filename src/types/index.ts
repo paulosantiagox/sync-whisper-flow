@@ -3,7 +3,6 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  password: string;
   role: 'master' | 'user';
   photo?: string;
   status: 'active' | 'pending' | 'inactive';
@@ -103,7 +102,7 @@ export interface StatusChangeNotification {
 export interface Campaign {
   id: string;
   userId: string;
-  projectId?: string; // Project to show number status summary
+  projectId?: string;
   name: string;
   description?: string;
   status: 'active' | 'archived';
