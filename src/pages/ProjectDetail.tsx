@@ -4,21 +4,21 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import EditNumberModal from '@/components/modals/EditNumberModal';
 import StatusHistoryModal from '@/components/modals/StatusHistoryModal';
 import BMModal from '@/components/modals/BMModal';
+import AddNumberFromMetaModal from '@/components/modals/AddNumberFromMetaModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import QualityBadge from '@/components/dashboard/QualityBadge';
-import { projects, whatsappNumbers, businessManagers, updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager } from '@/data/mockData';
+import { projects, whatsappNumbers, businessManagers, updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, addWhatsAppNumber } from '@/data/mockData';
 import { WhatsAppNumber, BusinessManager } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, 
-  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, FileText
+  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
@@ -35,7 +35,7 @@ const ProjectDetail = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [bmFilter, setBmFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortOption>('quality-asc');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddNumberModalOpen, setIsAddNumberModalOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isBMListOpen, setIsBMListOpen] = useState(false);
   
@@ -46,10 +46,6 @@ const ProjectDetail = () => {
   const [editBM, setEditBM] = useState<BusinessManager | null>(null);
   const [isNewBMOpen, setIsNewBMOpen] = useState(false);
   const [deleteBM, setDeleteBM] = useState<BusinessManager | null>(null);
-  
-  // Add number form
-  const [selectedBMId, setSelectedBMId] = useState('');
-  const [newCustomName, setNewCustomName] = useState('');
   
   // Force re-render
   const [, forceUpdate] = useState({});
@@ -156,6 +152,17 @@ const ProjectDetail = () => {
       setDeleteBM(null);
       forceUpdate({});
     }
+  };
+
+  const handleAddNumber = (numberData: Omit<WhatsAppNumber, 'id' | 'createdAt' | 'lastChecked'>) => {
+    const newNumber: WhatsAppNumber = {
+      ...numberData,
+      id: `wn${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      lastChecked: new Date().toISOString(),
+    };
+    addWhatsAppNumber(newNumber);
+    forceUpdate({});
   };
 
   const getBMName = (bmId?: string) => {
@@ -346,74 +353,11 @@ const ProjectDetail = () => {
               </DialogContent>
             </Dialog>
 
-            {/* Add Number Dialog */}
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gradient-primary"><Plus className="w-4 h-4 mr-2" />Adicionar Número</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Adicionar Número WhatsApp</DialogTitle></DialogHeader>
-                <form className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bmSelect">Selecionar BM *</Label>
-                    <Select value={selectedBMId} onValueChange={setSelectedBMId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma BM cadastrada" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projectBMs.length > 0 ? (
-                          projectBMs.map(bm => (
-                            <SelectItem key={bm.id} value={bm.id}>
-                              {bm.mainBmName} - {bm.mainBmId}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <SelectItem value="none" disabled>Nenhuma BM cadastrada</SelectItem>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {projectBMs.length === 0 && (
-                      <p className="text-xs text-destructive">Cadastre uma BM primeiro antes de adicionar números</p>
-                    )}
-                  </div>
-                  
-                  {selectedBMId && (
-                    <div className="p-3 bg-muted rounded-lg text-sm">
-                      <p className="font-medium mb-1">Dados da BM selecionada:</p>
-                      {(() => {
-                        const selectedBM = projectBMs.find(b => b.id === selectedBMId);
-                        return selectedBM ? (
-                          <div className="text-muted-foreground text-xs space-y-1">
-                            <p>Nome: {selectedBM.mainBmName}</p>
-                            <p>ID: {selectedBM.mainBmId}</p>
-                            {selectedBM.subBmName && <p>Sub BM: {selectedBM.subBmName}</p>}
-                            <p>Token: ****{selectedBM.accessToken.slice(-4)}</p>
-                          </div>
-                        ) : null;
-                      })()}
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label htmlFor="wabaId">WABA ID</Label>
-                    <Input id="wabaId" placeholder="987654321" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="customName">Nome Personalizado (opcional)</Label>
-                    <Input 
-                      id="customName" 
-                      placeholder="Ex: Conta API 1" 
-                      value={newCustomName}
-                      onChange={(e) => setNewCustomName(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancelar</Button>
-                    <Button type="submit" className="gradient-primary" disabled={!selectedBMId}>Buscar Números</Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
+            {/* Add Number Button - Opens Meta Modal */}
+            <Button className="gradient-primary" onClick={() => setIsAddNumberModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Número
+            </Button>
           </div>
         </div>
       </div>
@@ -502,7 +446,7 @@ const ProjectDetail = () => {
           <Phone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
           <h3 className="font-medium text-lg mb-2">Nenhum número cadastrado</h3>
           <p className="text-muted-foreground mb-4">Adicione seus números WhatsApp Business para começar o monitoramento.</p>
-          <Button className="gradient-primary" onClick={() => setIsAddDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Adicionar Primeiro Número</Button>
+          <Button className="gradient-primary" onClick={() => setIsAddNumberModalOpen(true)}><Plus className="w-4 h-4 mr-2" />Adicionar Primeiro Número</Button>
         </Card>
       ) : activeNumbers.length === 0 && inactiveNumbers.length === 0 ? (
         <Card className="p-8 text-center"><p className="text-muted-foreground">Nenhum número encontrado com os filtros selecionados</p></Card>
@@ -543,6 +487,13 @@ const ProjectDetail = () => {
       <EditNumberModal number={editNumber} open={!!editNumber} onOpenChange={(open) => !open && setEditNumber(null)} onSave={handleSaveNumber} />
       <StatusHistoryModal number={historyNumber} open={!!historyNumber} onOpenChange={(open) => !open && setHistoryNumber(null)} />
       <BMModal bm={editBM} projectId={id || ''} open={isNewBMOpen} onOpenChange={setIsNewBMOpen} onSave={handleSaveBM} />
+      <AddNumberFromMetaModal 
+        open={isAddNumberModalOpen} 
+        onOpenChange={setIsAddNumberModalOpen} 
+        projectId={id || ''} 
+        businessManagers={projectBMs}
+        onAddNumber={handleAddNumber}
+      />
       <ConfirmDialog open={!!deleteNumber} onOpenChange={(open) => !open && setDeleteNumber(null)} title="Remover Número" description={`Tem certeza que deseja remover o número ${deleteNumber?.displayPhoneNumber}? Esta ação não pode ser desfeita.`} confirmText="Remover" onConfirm={handleDeleteNumber} variant="destructive" />
       <ConfirmDialog open={!!deleteBM} onOpenChange={(open) => !open && setDeleteBM(null)} title="Remover BM" description={`Tem certeza que deseja remover a BM "${deleteBM?.mainBmName}"? Esta ação não pode ser desfeita.`} confirmText="Remover" onConfirm={handleDeleteBM} variant="destructive" />
     </DashboardLayout>
