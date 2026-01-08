@@ -51,6 +51,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const role = roleData?.role || 'user';
       setIsMaster(role === 'master');
 
+      // Block inactive users
+      if (profile?.status === 'inactive') {
+        setUser(null);
+        setSession(null);
+        setIsMaster(false);
+        await supabase.auth.signOut();
+        return null;
+      }
+
       if (profile) {
         const appUser: AppUser = {
           id: profile.id,
@@ -112,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<{ error: string | null }> => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -124,11 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error.message };
       }
 
+      // Ensure inactive users cannot remain logged in
+      const signedInUserId = data.user?.id;
+      if (signedInUserId) {
+        const appUser = await fetchUserProfile(signedInUserId);
+        if (!appUser) {
+          return { error: 'Sua conta está desativada. Fale com o administrador.' };
+        }
+      }
+
       return { error: null };
     } catch (error) {
       return { error: 'Erro ao fazer login' };
     }
-  }, []);
+  }, [fetchUserProfile]);
 
   const signup = useCallback(async (email: string, password: string, name: string): Promise<{ error: string | null }> => {
     try {
