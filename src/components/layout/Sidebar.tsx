@@ -26,19 +26,12 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
   const { user, logout, isMaster } = useAuth();
   const location = useLocation();
 
-  const masterNavItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
-    { icon: Users, label: 'Usuários', href: '/users' },
-    { icon: FolderKanban, label: 'Todos Projetos', href: '/all-projects' },
-  ];
-
-  const userNavItems = [
+  const navItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
     { icon: FolderKanban, label: 'Projetos', href: '/projects' },
     { icon: Megaphone, label: 'Campanhas', href: '/campaigns' },
+    ...(isMaster ? [{ icon: Users, label: 'Usuários', href: '/users' }] : []),
   ];
-
-  const navItems = isMaster ? masterNavItems : userNavItems;
 
   const isActive = (href: string) => location.pathname === href;
 

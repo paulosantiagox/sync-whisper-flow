@@ -7,22 +7,28 @@ import { toast } from 'sonner';
 // ===================== CAMPAIGNS =====================
 
 export function useCampaigns() {
-  const { user } = useAuth();
+  const { user, isMaster } = useAuth();
 
   return useQuery({
-    queryKey: ['campaigns', user?.id],
+    queryKey: ['campaigns', user?.id, isMaster],
     queryFn: async () => {
       if (!user) return [];
-      
-      const { data, error } = await supabase
+
+      let query = supabase
         .from('campaigns')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
+      // If not master, filter by user_id
+      if (!isMaster) {
+        query = query.eq('user_id', user.id);
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      
-      return data.map((c): Campaign => ({
+
+      return (data || []).map((c): Campaign => ({
         id: c.id,
         userId: c.user_id,
         projectId: c.project_id || undefined,
