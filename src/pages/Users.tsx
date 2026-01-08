@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useUsers, useUserStats, useUpdateUserStatus } from '@/hooks/useUsers';
+import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole, useDeleteUser } from '@/hooks/useUsers';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { Button } from '@/components/ui/button';
@@ -8,20 +8,47 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, UserPlus, Check, X, Eye, Edit2, Trash2, Users as UsersIcon, FolderKanban, Phone, Activity, Loader2 } from 'lucide-react';
+import { 
+  Search, Check, X, Eye, MoreHorizontal, Users as UsersIcon, 
+  FolderKanban, Phone, Activity, Loader2, Shield, UserMinus, 
+  RefreshCw, Trash2 
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import UserDetailModal from '@/components/modals/UserDetailModal';
+import { User } from '@/types';
 
 const UsersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users = [], isLoading } = useUsers();
   const { data: stats } = useUserStats();
   const { data: projects = [] } = useProjects();
   const { data: numbers = [] } = useAllWhatsAppNumbers();
   const updateStatus = useUpdateUserStatus();
+  const updateRole = useUpdateUserRole();
+  const deleteUser = useDeleteUser();
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -34,6 +61,13 @@ const UsersPage = () => {
     const projectIds = userProjects.map(p => p.id);
     const userNumbers = numbers.filter(n => projectIds.includes(n.projectId));
     return { projects: userProjects.length, numbers: userNumbers.length };
+  };
+
+  const handleDeleteConfirm = () => {
+    if (userToDelete) {
+      deleteUser.mutate(userToDelete.id);
+      setUserToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -99,14 +133,79 @@ const UsersPage = () => {
                   <TableCell className="text-center"><span className="flex items-center justify-center gap-1"><Phone className="w-4 h-4 text-muted-foreground" />{userStats.numbers}</span></TableCell>
                   <TableCell className="text-muted-foreground">{format(new Date(user.createdAt), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      {user.status === 'pending' && (
-                        <Button size="icon" variant="ghost" className="h-8 w-8 text-success hover:text-success hover:bg-success/10" onClick={() => updateStatus.mutate({ userId: user.id, status: 'active' })}>
-                          <Check className="w-4 h-4" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="w-4 h-4" />
                         </Button>
-                      )}
-                      <Button size="icon" variant="ghost" className="h-8 w-8"><Eye className="w-4 h-4" /></Button>
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        
+                        <DropdownMenuSeparator />
+                        
+                        {user.status === 'pending' && (
+                          <DropdownMenuItem 
+                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'active' })}
+                            className="text-success focus:text-success"
+                          >
+                            <Check className="mr-2 h-4 w-4" />
+                            Aprovar
+                          </DropdownMenuItem>
+                        )}
+                        
+                        {user.status === 'active' && (
+                          <DropdownMenuItem 
+                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'inactive' })}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Desativar
+                          </DropdownMenuItem>
+                        )}
+                        
+                        {user.status === 'inactive' && (
+                          <DropdownMenuItem 
+                            onClick={() => updateStatus.mutate({ userId: user.id, status: 'active' })}
+                          >
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Reativar
+                          </DropdownMenuItem>
+                        )}
+                        
+                        <DropdownMenuSeparator />
+                        
+                        {user.role === 'user' && (
+                          <DropdownMenuItem 
+                            onClick={() => updateRole.mutate({ userId: user.id, role: 'master' })}
+                          >
+                            <Shield className="mr-2 h-4 w-4" />
+                            Promover a Admin
+                          </DropdownMenuItem>
+                        )}
+                        
+                        {user.role === 'master' && (
+                          <DropdownMenuItem 
+                            onClick={() => updateRole.mutate({ userId: user.id, role: 'user' })}
+                          >
+                            <UserMinus className="mr-2 h-4 w-4" />
+                            Rebaixar a Usuário
+                          </DropdownMenuItem>
+                        )}
+                        
+                        <DropdownMenuSeparator />
+                        
+                        <DropdownMenuItem 
+                          onClick={() => setUserToDelete(user)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               );
@@ -114,6 +213,33 @@ const UsersPage = () => {
           </TableBody>
         </Table>
       </Card>
+
+      {/* User Detail Modal */}
+      <UserDetailModal
+        user={selectedUser}
+        open={!!selectedUser}
+        onOpenChange={(open) => !open && setSelectedUser(null)}
+        projectsCount={selectedUser ? getUserStats(selectedUser.id).projects : 0}
+        numbersCount={selectedUser ? getUserStats(selectedUser.id).numbers : 0}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o usuário <strong>{userToDelete?.name}</strong>? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
