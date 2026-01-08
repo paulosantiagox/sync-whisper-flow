@@ -406,6 +406,11 @@ const Campaigns = () => {
                 projects={userProjects}
                 selectedProjectId={campaignProjectId}
                 onProjectChange={handleProjectChange}
+                onRefresh={() => {
+                  toast({ title: "Atualizando...", description: "Buscando status atualizado das contas." });
+                  // In a real app, this would call an API to refresh the data
+                  setUpdateKey(k => k + 1);
+                }}
               />
 
               {/* Broadcasts Table */}
