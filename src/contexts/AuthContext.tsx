@@ -6,6 +6,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => boolean;
   logout: () => void;
+  updateUser: (updates: Partial<User>) => void;
   isAuthenticated: boolean;
   isMaster: boolean;
 }
@@ -60,11 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('waba_user');
   }, []);
 
+  const updateUser = useCallback((updates: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updates };
+      localStorage.setItem('waba_user', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   return (
     <AuthContext.Provider value={{
       user,
       login,
       logout,
+      updateUser,
       isAuthenticated: !!user,
       isMaster: user?.role === 'master'
     }}>
