@@ -5,6 +5,7 @@ import BroadcastModal from '@/components/modals/BroadcastModal';
 import ActionTypeModal from '@/components/modals/ActionTypeModal';
 import ShortcutModal from '@/components/modals/ShortcutModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
+import QualityBadge from '@/components/dashboard/QualityBadge';
 import { 
   campaigns, actionTypes, broadcasts, whatsappNumbers, projects, 
   addBroadcast, updateBroadcast, deleteBroadcast, 
@@ -23,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Users, MessageCircle, 
@@ -530,23 +532,44 @@ const Campaigns = () => {
                                 <TableCell>
                                   <div className="flex items-center gap-2">
                                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                                    <span>{format(new Date(broadcast.date), "dd/MM", { locale: ptBR })} {broadcast.time}</span>
+                                    <span className="text-sm">{format(new Date(broadcast.date), "dd/MM/yyyy", { locale: ptBR })} {broadcast.time}</span>
                                   </div>
                                 </TableCell>
                                 <TableCell>
                                   <Badge style={{ backgroundColor: actionType?.color }}>{actionType?.name || 'N/A'}</Badge>
                                 </TableCell>
-                                <TableCell className="text-muted-foreground text-sm">
-                                  {phoneNum?.customName || phoneNum?.displayPhoneNumber || 'N/A'}
+                                <TableCell>
+                                  <div className="flex items-center gap-1.5 text-xs">
+                                    {phoneNum && <QualityBadge rating={phoneNum.qualityRating} showLabel={false} size="sm" />}
+                                    <span className="font-medium truncate max-w-[100px]">
+                                      {phoneNum?.customName || phoneNum?.verifiedName || 'N/A'}
+                                    </span>
+                                    {phoneNum?.displayPhoneNumber && (
+                                      <span className="text-muted-foreground">
+                                        •{phoneNum.displayPhoneNumber.slice(-4)}
+                                      </span>
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.templateUsed}</TableCell>
                                 <TableCell>
-                                  {broadcast.observations ? (
-                                    <span className="text-xs text-muted-foreground line-clamp-2 max-w-[150px]">{broadcast.observations}</span>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">-</span>
-                                  )}
+                                  <TooltipProvider>
+                                    {broadcast.observations ? (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <span className="text-xs text-muted-foreground truncate block max-w-[80px] cursor-help">
+                                            {broadcast.observations}
+                                          </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-[300px] bg-popover text-popover-foreground">
+                                          <p className="whitespace-pre-wrap text-sm">{broadcast.observations}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ) : (
+                                      <span className="text-xs text-muted-foreground">-</span>
+                                    )}
+                                  </TooltipProvider>
                                 </TableCell>
                                 <TableCell className="text-right font-medium">{broadcast.contactCount.toLocaleString()}</TableCell>
                                 <TableCell>
