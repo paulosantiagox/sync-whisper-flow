@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { WhatsAppNumber, QualityRating, Project } from '@/types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ArrowUpDown, ArrowUp, ArrowDown, Phone } from 'lucide-react';
+import { ArrowUp, ArrowDown, Phone, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface QualitySummaryProps {
@@ -10,6 +10,8 @@ interface QualitySummaryProps {
   projects: Project[];
   selectedProjectId: string;
   onProjectChange: (projectId: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 type SortField = 'name' | 'quality';
@@ -21,7 +23,14 @@ const qualityOrder: Record<QualityRating, number> = {
   LOW: 1,
 };
 
-const QualitySummary = ({ numbers, projects, selectedProjectId, onProjectChange }: QualitySummaryProps) => {
+const QualitySummary = ({ 
+  numbers, 
+  projects, 
+  selectedProjectId, 
+  onProjectChange,
+  onRefresh,
+  isRefreshing = false
+}: QualitySummaryProps) => {
   const [qualityFilter, setQualityFilter] = useState<QualityRating | 'all'>('all');
   const [sortField, setSortField] = useState<SortField>('quality');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
@@ -68,12 +77,61 @@ const QualitySummary = ({ numbers, projects, selectedProjectId, onProjectChange 
 
   return (
     <div className="bg-card border rounded-lg p-4 mb-4">
+      {/* Header with title, stats and controls */}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Phone className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Status das Contas</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Phone className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Status das Contas</span>
+          </div>
+          
+          {/* Stats inline with title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setQualityFilter(qualityFilter === 'HIGH' ? 'all' : 'HIGH')}
+              className={cn(
+                "flex items-center gap-1 text-xs transition-opacity",
+                qualityFilter !== 'all' && qualityFilter !== 'HIGH' && "opacity-50"
+              )}
+            >
+              <RadarIcon color="hsl(var(--success))" size="sm" />
+              <span className="font-medium">{stats.high}</span>
+            </button>
+            <button
+              onClick={() => setQualityFilter(qualityFilter === 'MEDIUM' ? 'all' : 'MEDIUM')}
+              className={cn(
+                "flex items-center gap-1 text-xs transition-opacity",
+                qualityFilter !== 'all' && qualityFilter !== 'MEDIUM' && "opacity-50"
+              )}
+            >
+              <RadarIcon color="hsl(var(--warning))" size="sm" />
+              <span className="font-medium">{stats.medium}</span>
+            </button>
+            <button
+              onClick={() => setQualityFilter(qualityFilter === 'LOW' ? 'all' : 'LOW')}
+              className={cn(
+                "flex items-center gap-1 text-xs transition-opacity",
+                qualityFilter !== 'all' && qualityFilter !== 'LOW' && "opacity-50"
+              )}
+            >
+              <RadarIcon color="hsl(var(--destructive))" size="sm" />
+              <span className="font-medium">{stats.low}</span>
+            </button>
+          </div>
         </div>
+        
         <div className="flex items-center gap-2 flex-wrap">
+          {onRefresh && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn("w-4 h-4", isRefreshing && "animate-spin")} />
+            </Button>
+          )}
           <Select value={selectedProjectId} onValueChange={onProjectChange}>
             <SelectTrigger className="w-[180px] h-8 text-xs">
               <SelectValue placeholder="Selecione o projeto" />
@@ -85,8 +143,8 @@ const QualitySummary = ({ numbers, projects, selectedProjectId, onProjectChange 
             </SelectContent>
           </Select>
           <Select value={qualityFilter} onValueChange={(v) => setQualityFilter(v as QualityRating | 'all')}>
-            <SelectTrigger className="w-[120px] h-8 text-xs">
-              <SelectValue placeholder="Qualidade" />
+            <SelectTrigger className="w-[100px] h-8 text-xs">
+              <SelectValue placeholder="Filtrar" />
             </SelectTrigger>
             <SelectContent className="bg-popover">
               <SelectItem value="all">Todas</SelectItem>
@@ -114,43 +172,6 @@ const QualitySummary = ({ numbers, projects, selectedProjectId, onProjectChange 
             {sortField === 'quality' && <SortIcon className="w-3 h-3 ml-1" />}
           </Button>
         </div>
-      </div>
-
-      {/* Stats Summary */}
-      <div className="flex items-center gap-6 mb-4">
-        <button
-          onClick={() => setQualityFilter(qualityFilter === 'HIGH' ? 'all' : 'HIGH')}
-          className={cn(
-            "flex items-center gap-2 text-xs transition-opacity",
-            qualityFilter !== 'all' && qualityFilter !== 'HIGH' && "opacity-50"
-          )}
-        >
-          <RadarIcon color="hsl(var(--success))" />
-          <span className="font-medium">{stats.high}</span>
-          <span className="text-muted-foreground">Alta</span>
-        </button>
-        <button
-          onClick={() => setQualityFilter(qualityFilter === 'MEDIUM' ? 'all' : 'MEDIUM')}
-          className={cn(
-            "flex items-center gap-2 text-xs transition-opacity",
-            qualityFilter !== 'all' && qualityFilter !== 'MEDIUM' && "opacity-50"
-          )}
-        >
-          <RadarIcon color="hsl(var(--warning))" />
-          <span className="font-medium">{stats.medium}</span>
-          <span className="text-muted-foreground">Média</span>
-        </button>
-        <button
-          onClick={() => setQualityFilter(qualityFilter === 'LOW' ? 'all' : 'LOW')}
-          className={cn(
-            "flex items-center gap-2 text-xs transition-opacity",
-            qualityFilter !== 'all' && qualityFilter !== 'LOW' && "opacity-50"
-          )}
-        >
-          <RadarIcon color="hsl(var(--destructive))" />
-          <span className="font-medium">{stats.low}</span>
-          <span className="text-muted-foreground">Baixa</span>
-        </button>
       </div>
 
       {/* Numbers List */}
