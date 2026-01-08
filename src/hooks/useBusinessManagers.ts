@@ -9,7 +9,11 @@ export function useBusinessManagers(projectId?: string) {
     queryFn: async () => {
       console.log('=== DEBUG BMs ===');
       console.log('ProjectId recebido:', projectId);
-      
+
+      // Loga apenas o userId (sem tokens) para diagnosticar RLS
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('Auth userId:', sessionData.session?.user?.id ?? null);
+
       let query = supabase
         .from('business_managers')
         .select('*')
@@ -20,13 +24,25 @@ export function useBusinessManagers(projectId?: string) {
       }
 
       const { data, error } = await query;
-      
+
       console.log('Dados retornados:', data);
       console.log('Erro RLS/Supabase:', error);
 
+      // Se vier vazio, testa visibilidade geral (se RLS estiver bloqueando, isso também virá vazio)
+      if (projectId && (!data || data.length === 0)) {
+        const { data: anyVisible, error: anyVisibleError } = await supabase
+          .from('business_managers')
+          .select('id, project_id')
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        console.log('DEBUG visibilidade geral (até 5):', anyVisible);
+        console.log('DEBUG visibilidade geral - erro:', anyVisibleError);
+      }
+
       if (error) throw error;
-      
-      return data.map((bm): BusinessManager => ({
+
+      return (data || []).map((bm): BusinessManager => ({
         id: bm.id,
         projectId: bm.project_id,
         mainBmName: bm.main_bm_name,
