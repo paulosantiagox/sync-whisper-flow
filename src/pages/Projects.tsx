@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProjectCard from '@/components/dashboard/ProjectCard';
-import { projects, whatsappNumbers } from '@/data/mockData';
+import { projects, whatsappNumbers, addProject } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,13 +11,47 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FolderKanban, Plus, Search } from 'lucide-react';
 import { Card } from '@/components/ui/card';
+import { toast } from 'sonner';
+import { Project } from '@/types';
 
 const Projects = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [, setRefresh] = useState(0);
 
   const userProjects = projects.filter(p => p.userId === user?.id);
+
+  const handleCreateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!projectName.trim()) {
+      toast.error('Digite o nome do projeto');
+      return;
+    }
+
+    const newProject: Project = {
+      id: `p${Date.now()}`,
+      userId: user?.id || '',
+      name: projectName.trim(),
+      description: projectDescription.trim() || undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    addProject(newProject);
+    toast.success('Projeto criado com sucesso!');
+    setProjectName('');
+    setProjectDescription('');
+    setIsDialogOpen(false);
+    setRefresh(r => r + 1);
+    
+    // Navigate to the new project
+    navigate(`/projects/${newProject.id}`);
+  };
   
   const filteredProjects = userProjects.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -39,14 +74,24 @@ const Projects = () => {
               <DialogHeader>
                 <DialogTitle>Criar Novo Projeto</DialogTitle>
               </DialogHeader>
-              <form className="space-y-4 mt-4">
+              <form className="space-y-4 mt-4" onSubmit={handleCreateProject}>
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome do Projeto</Label>
-                  <Input id="name" placeholder="Ex: E-commerce Principal" />
+                  <Input 
+                    id="name" 
+                    placeholder="Ex: E-commerce Principal" 
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="description">Descrição (opcional)</Label>
-                  <Textarea id="description" placeholder="Descreva o propósito deste projeto..." />
+                  <Textarea 
+                    id="description" 
+                    placeholder="Descreva o propósito deste projeto..." 
+                    value={projectDescription}
+                    onChange={(e) => setProjectDescription(e.target.value)}
+                  />
                 </div>
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

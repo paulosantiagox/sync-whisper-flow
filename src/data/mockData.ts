@@ -46,7 +46,7 @@ export const users: User[] = [
   }
 ];
 
-export const projects: Project[] = [
+export let projects: Project[] = [
   {
     id: 'p1',
     userId: '2',
@@ -80,6 +80,21 @@ export const projects: Project[] = [
     updatedAt: '2025-01-04T11:00:00Z'
   }
 ];
+
+// Project CRUD functions
+export const addProject = (project: Project) => {
+  projects = [...projects, project];
+  return project;
+};
+
+export const updateProject = (id: string, data: Partial<Project>) => {
+  projects = projects.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p);
+  return projects.find(p => p.id === id);
+};
+
+export const deleteProject = (id: string) => {
+  projects = projects.filter(p => p.id !== id);
+};
 
 export let businessManagers: BusinessManager[] = [
   {
