@@ -5,13 +5,14 @@ import BroadcastModal from '@/components/modals/BroadcastModal';
 import ActionTypeModal from '@/components/modals/ActionTypeModal';
 import ShortcutModal from '@/components/modals/ShortcutModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
+import QualitySummary from '@/components/dashboard/QualitySummary';
 
 import { 
   campaigns, actionTypes, broadcasts, whatsappNumbers, projects, 
   addBroadcast, updateBroadcast, deleteBroadcast, 
   addActionType, updateActionType, deleteActionType,
   campaignShortcuts, addCampaignShortcut, updateCampaignShortcut, deleteCampaignShortcut,
-  addCampaign
+  addCampaign, updateCampaign
 } from '@/data/mockData';
 import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut, Campaign } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Users, MessageCircle, 
+  Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, 
   Edit2, Trash2, Tag, Filter, Copy, Zap, Check
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -67,6 +68,7 @@ const Campaigns = () => {
   // New campaign form state
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDescription, setNewCampaignDescription] = useState('');
+  const [newCampaignProjectId, setNewCampaignProjectId] = useState('');
 
   const userCampaigns = campaigns.filter(c => c.userId === user?.id);
   const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : userCampaigns[0];
@@ -91,7 +93,18 @@ const Campaigns = () => {
   const userProjects = projects.filter(p => p.userId === user?.id);
   const userNumbers = whatsappNumbers.filter(n => userProjects.some(p => p.id === n.projectId));
 
-  const getTotalContacts = () => campaignBroadcasts.reduce((acc, b) => acc + b.contactCount, 0);
+  // Campaign project selection state
+  const [campaignProjectId, setCampaignProjectId] = useState<string>(
+    activeCampaign?.projectId || userProjects[0]?.id || ''
+  );
+
+  const handleProjectChange = (projectId: string) => {
+    setCampaignProjectId(projectId);
+    if (activeCampaign) {
+      updateCampaign(activeCampaign.id, { projectId });
+      setUpdateKey(k => k + 1);
+    }
+  };
 
   const handleCreateCampaign = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +116,7 @@ const Campaigns = () => {
     const newCampaign: Campaign = {
       id: `c${Date.now()}`,
       userId: user?.id || '',
+      projectId: newCampaignProjectId || userProjects[0]?.id,
       name: newCampaignName.trim(),
       description: newCampaignDescription.trim() || undefined,
       status: 'active',
@@ -111,8 +125,10 @@ const Campaigns = () => {
     
     addCampaign(newCampaign);
     setSelectedCampaign(newCampaign.id);
+    setCampaignProjectId(newCampaign.projectId || '');
     setNewCampaignName('');
     setNewCampaignDescription('');
+    setNewCampaignProjectId('');
     setIsNewCampaignOpen(false);
     setUpdateKey(k => k + 1);
     toast({ title: "Campanha criada!", description: `"${newCampaign.name}" foi criada com sucesso.` });
@@ -220,6 +236,19 @@ const Campaigns = () => {
                       value={newCampaignDescription}
                       onChange={(e) => setNewCampaignDescription(e.target.value)}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign-project">Projeto para Resumo de Status</Label>
+                    <Select value={newCampaignProjectId} onValueChange={setNewCampaignProjectId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um projeto" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        {userProjects.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>Cancelar</Button>
@@ -371,42 +400,13 @@ const Campaigns = () => {
         <div className="lg:col-span-3">
           {activeCampaign ? (
             <div className="space-y-6">
-              {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
-                      <Send className="w-5 h-5 text-primary-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{campaignBroadcasts.length}</p>
-                      <p className="text-xs text-muted-foreground">Disparos Realizados</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center">
-                      <Users className="w-5 h-5 text-success-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{getTotalContacts().toLocaleString()}</p>
-                      <p className="text-xs text-muted-foreground">Contatos Impactados</p>
-                    </div>
-                  </div>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                      <MessageCircle className="w-5 h-5 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{campaignActionTypes.length}</p>
-                      <p className="text-xs text-muted-foreground">Tipos de Ação</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
+              {/* Quality Summary */}
+              <QualitySummary
+                numbers={whatsappNumbers}
+                projects={userProjects}
+                selectedProjectId={campaignProjectId}
+                onProjectChange={handleProjectChange}
+              />
 
               {/* Broadcasts Table */}
               <Card>

@@ -103,6 +103,7 @@ export interface StatusChangeNotification {
 export interface Campaign {
   id: string;
   userId: string;
+  projectId?: string; // Project to show number status summary
   name: string;
   description?: string;
   status: 'active' | 'archived';
