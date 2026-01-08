@@ -486,7 +486,7 @@ const ProjectDetail = () => {
       {/* Modals */}
       <EditNumberModal number={editNumber} open={!!editNumber} onOpenChange={(open) => !open && setEditNumber(null)} onSave={handleSaveNumber} />
       <StatusHistoryModal number={historyNumber} open={!!historyNumber} onOpenChange={(open) => !open && setHistoryNumber(null)} />
-      <BMModal bm={editBM} projectId={id || ''} open={isNewBMOpen} onOpenChange={setIsNewBMOpen} onSave={handleSaveBM} />
+      <BMModal bm={editBM} projectId={id || ''} open={isNewBMOpen} onOpenChange={setIsNewBMOpen} onSave={handleSaveBM} existingBMs={projectBMs} />
       <AddNumberFromMetaModal 
         open={isAddNumberModalOpen} 
         onOpenChange={setIsAddNumberModalOpen} 

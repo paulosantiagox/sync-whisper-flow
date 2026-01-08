@@ -90,3 +90,45 @@ export const fetchPhoneNumberDetail = async (
 
   return response.json();
 };
+
+// Fetch Business Manager name
+export const fetchBusinessManagerName = async (
+  bmId: string,
+  accessToken: string
+): Promise<{ id: string; name: string }> => {
+  const url = `${META_API_BASE}/${bmId}?fields=id,name`;
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Erro ao buscar dados da BM');
+  }
+
+  return response.json();
+};
+
+// Fetch WABA name
+export const fetchWABAName = async (
+  wabaId: string,
+  accessToken: string
+): Promise<{ id: string; name: string }> => {
+  const url = `${META_API_BASE}/${wabaId}?fields=id,name`;
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || 'Erro ao buscar dados da WABA');
+  }
+
+  return response.json();
+};
