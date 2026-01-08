@@ -103,6 +103,31 @@ export function useUpdateUserRole() {
   });
 }
 
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      // Delete from profiles (cascade will handle user_roles)
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      toast.success('Usuário excluído com sucesso!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao excluir usuário');
+      console.error(error);
+    },
+  });
+}
+
 export function useUserStats() {
   return useQuery({
     queryKey: ['user-stats'],
