@@ -52,11 +52,26 @@ export function useUpdateUserStatus() {
 
       if (error) throw error;
     },
+    onMutate: async ({ userId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+
+      const previousUsers = queryClient.getQueryData<User[]>(['users']);
+
+      if (previousUsers) {
+        queryClient.setQueryData<User[]>(['users'], previousUsers.map(u => u.id === userId ? { ...u, status } : u));
+      }
+
+      return { previousUsers };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       toast.success('Status do usuário atualizado!');
     },
-    onError: (error) => {
+    onError: (error, _vars, ctx) => {
+      if (ctx?.previousUsers) {
+        queryClient.setQueryData(['users'], ctx.previousUsers);
+      }
       toast.error('Erro ao atualizar status');
       console.error(error);
     },
