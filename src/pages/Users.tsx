@@ -52,6 +52,7 @@ const UsersPage = () => {
   };
 
   const handleToggleStatus = (user: User) => {
+    // If active, set to inactive. Otherwise (pending or inactive), set to active
     const newStatus = user.status === 'active' ? 'inactive' : 'active';
     updateStatus.mutate({ userId: user.id, status: newStatus });
   };
@@ -123,12 +124,16 @@ const UsersPage = () => {
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center gap-2">
                       <Switch
                         checked={isActive}
                         onCheckedChange={() => handleToggleStatus(user)}
-                        className={isActive ? 'data-[state=checked]:bg-success' : 'data-[state=unchecked]:bg-destructive'}
+                        disabled={updateStatus.isPending}
+                        className="data-[state=checked]:bg-success data-[state=unchecked]:bg-destructive"
                       />
+                      <span className="text-xs text-muted-foreground min-w-[60px]">
+                        {isActive ? 'Ativo' : user.status === 'pending' ? 'Pendente' : 'Inativo'}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="text-center"><span className="flex items-center justify-center gap-1"><FolderKanban className="w-4 h-4 text-muted-foreground" />{userStats.projects}</span></TableCell>
