@@ -5,7 +5,7 @@ import BroadcastModal from '@/components/modals/BroadcastModal';
 import ActionTypeModal from '@/components/modals/ActionTypeModal';
 import ShortcutModal from '@/components/modals/ShortcutModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
-import QualityBadge from '@/components/dashboard/QualityBadge';
+
 import { 
   campaigns, actionTypes, broadcasts, whatsappNumbers, projects, 
   addBroadcast, updateBroadcast, deleteBroadcast, 
@@ -540,7 +540,9 @@ const Campaigns = () => {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex items-center gap-1.5 text-xs">
-                                    {phoneNum && <QualityBadge rating={phoneNum.qualityRating} showLabel={false} size="sm" />}
+                                    {phoneNum && (
+                                      <span>{phoneNum.qualityRating === 'HIGH' ? '🟢' : phoneNum.qualityRating === 'MEDIUM' ? '🟡' : '🔴'}</span>
+                                    )}
                                     <span className="font-medium truncate max-w-[100px]">
                                       {phoneNum?.customName || phoneNum?.verifiedName || 'N/A'}
                                     </span>
@@ -554,7 +556,7 @@ const Campaigns = () => {
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.templateUsed}</TableCell>
                                 <TableCell>
-                                  <TooltipProvider>
+                                  <TooltipProvider delayDuration={0}>
                                     {broadcast.observations ? (
                                       <Tooltip>
                                         <TooltipTrigger asChild>
