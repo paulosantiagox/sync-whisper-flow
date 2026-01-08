@@ -180,13 +180,18 @@ const AddNumberFromMetaModal = ({
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione uma BM cadastrada" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border z-50">
                   {businessManagers.length > 0 ? (
                     businessManagers.map(bm => (
-                      <SelectItem key={bm.id} value={bm.id}>
+                      <SelectItem key={bm.id} value={bm.id} className="py-3">
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4" />
-                          {bm.mainBmName}
+                          <Building2 className="w-4 h-4 flex-shrink-0" />
+                          <div className="flex flex-col items-start">
+                            <span className="font-medium">{bm.mainBmName}</span>
+                            {bm.subBmName && (
+                              <span className="text-xs text-muted-foreground">{bm.subBmName}</span>
+                            )}
+                          </div>
                         </div>
                       </SelectItem>
                     ))
