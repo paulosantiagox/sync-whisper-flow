@@ -187,9 +187,13 @@ const AddNumberFromMetaModal = ({
                         <div className="flex items-center gap-2">
                           <Building2 className="w-4 h-4 flex-shrink-0" />
                           <div className="flex flex-col items-start">
-                            <span className="font-medium">{bm.mainBmName}</span>
+                            <span className="font-medium">
+                              {bm.mainBmName} <span className="text-muted-foreground font-normal">#{bm.mainBmId.slice(-4)}</span>
+                            </span>
                             {bm.subBmName && (
-                              <span className="text-xs text-muted-foreground">{bm.subBmName}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {bm.subBmName} <span className="opacity-70">#{bm.subBmId?.slice(-4)}</span>
+                              </span>
                             )}
                           </div>
                         </div>
