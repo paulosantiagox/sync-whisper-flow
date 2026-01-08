@@ -9,9 +9,10 @@ import {
   campaigns, actionTypes, broadcasts, whatsappNumbers, projects, 
   addBroadcast, updateBroadcast, deleteBroadcast, 
   addActionType, updateActionType, deleteActionType,
-  campaignShortcuts, addCampaignShortcut, updateCampaignShortcut, deleteCampaignShortcut
+  campaignShortcuts, addCampaignShortcut, updateCampaignShortcut, deleteCampaignShortcut,
+  addCampaign
 } from '@/data/mockData';
-import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut } from '@/types';
+import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut, Campaign } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -61,6 +62,10 @@ const Campaigns = () => {
   const [isNewShortcutOpen, setIsNewShortcutOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<{ type: 'broadcast' | 'actionType' | 'shortcut'; item: any } | null>(null);
 
+  // New campaign form state
+  const [newCampaignName, setNewCampaignName] = useState('');
+  const [newCampaignDescription, setNewCampaignDescription] = useState('');
+
   const userCampaigns = campaigns.filter(c => c.userId === user?.id);
   const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : userCampaigns[0];
   
@@ -79,6 +84,31 @@ const Campaigns = () => {
   const userNumbers = whatsappNumbers.filter(n => userProjects.some(p => p.id === n.projectId));
 
   const getTotalContacts = () => campaignBroadcasts.reduce((acc, b) => acc + b.contactCount, 0);
+
+  const handleCreateCampaign = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCampaignName.trim()) {
+      toast({ title: "Erro", description: "Nome da campanha é obrigatório", variant: "destructive" });
+      return;
+    }
+    
+    const newCampaign: Campaign = {
+      id: `c${Date.now()}`,
+      userId: user?.id || '',
+      name: newCampaignName.trim(),
+      description: newCampaignDescription.trim() || undefined,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    
+    addCampaign(newCampaign);
+    setSelectedCampaign(newCampaign.id);
+    setNewCampaignName('');
+    setNewCampaignDescription('');
+    setIsNewCampaignOpen(false);
+    forceUpdate({});
+    toast({ title: "Campanha criada!", description: `"${newCampaign.name}" foi criada com sucesso.` });
+  };
 
   const handleSaveBroadcast = (broadcast: Broadcast) => {
     if (editBroadcast) {
@@ -227,10 +257,29 @@ const Campaigns = () => {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Criar Nova Campanha</DialogTitle></DialogHeader>
-                <form className="space-y-4 mt-4">
-                  <div className="space-y-2"><Label htmlFor="name">Nome da Campanha</Label><Input id="name" placeholder="Ex: Lançamento Janeiro" /></div>
-                  <div className="space-y-2"><Label htmlFor="description">Descrição</Label><Input id="description" placeholder="Descreva o objetivo da campanha" /></div>
-                  <div className="flex justify-end gap-2 pt-4"><Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>Cancelar</Button><Button type="submit" className="gradient-primary">Criar Campanha</Button></div>
+                <form className="space-y-4 mt-4" onSubmit={handleCreateCampaign}>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign-name">Nome da Campanha</Label>
+                    <Input 
+                      id="campaign-name" 
+                      placeholder="Ex: Lançamento Janeiro" 
+                      value={newCampaignName}
+                      onChange={(e) => setNewCampaignName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign-description">Descrição</Label>
+                    <Input 
+                      id="campaign-description" 
+                      placeholder="Descreva o objetivo da campanha" 
+                      value={newCampaignDescription}
+                      onChange={(e) => setNewCampaignDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setIsNewCampaignOpen(false)}>Cancelar</Button>
+                    <Button type="submit" className="gradient-primary">Criar Campanha</Button>
+                  </div>
                 </form>
               </DialogContent>
             </Dialog>

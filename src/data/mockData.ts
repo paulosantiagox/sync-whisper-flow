@@ -314,6 +314,20 @@ export let campaigns: Campaign[] = [
   }
 ];
 
+export const addCampaign = (campaign: Campaign) => {
+  campaigns = [...campaigns, campaign];
+  return campaign;
+};
+
+export const updateCampaign = (id: string, data: Partial<Campaign>) => {
+  campaigns = campaigns.map(c => c.id === id ? { ...c, ...data } : c);
+  return campaigns.find(c => c.id === id);
+};
+
+export const deleteCampaign = (id: string) => {
+  campaigns = campaigns.filter(c => c.id !== id);
+};
+
 export let actionTypes: ActionType[] = [
   { id: 'at1', campaignId: 'c1', name: 'Convite', color: '#3B82F6', description: 'Convites para eventos', isActive: true },
   { id: 'at2', campaignId: 'c1', name: 'Lançamento', color: '#10B981', description: 'Lançamentos de produtos', isActive: true },
