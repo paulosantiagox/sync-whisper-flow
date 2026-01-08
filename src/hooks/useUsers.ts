@@ -45,12 +45,18 @@ export function useUpdateUserStatus() {
 
   return useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: 'active' | 'pending' | 'inactive' }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .update({ status })
-        .eq('id', userId);
+        .eq('id', userId)
+        .select('id, status');
 
       if (error) throw error;
+
+      const updated = data?.[0];
+      if (!updated) throw new Error('Nenhum usuário foi atualizado');
+
+      return { userId, status: updated.status as 'active' | 'pending' | 'inactive' };
     },
     onMutate: async ({ userId, status }) => {
       await queryClient.cancelQueries({ queryKey: ['users'] });
@@ -63,8 +69,13 @@ export function useUpdateUserStatus() {
 
       return { previousUsers };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
+    onSuccess: (result) => {
+      // Keep cache in sync (avoid flicker)
+      const currentUsers = queryClient.getQueryData<User[]>(['users']);
+      if (currentUsers) {
+        queryClient.setQueryData<User[]>(['users'], currentUsers.map(u => u.id === result.userId ? { ...u, status: result.status } : u));
+      }
+
       queryClient.invalidateQueries({ queryKey: ['user-stats'] });
       toast.success('Status do usuário atualizado!');
     },

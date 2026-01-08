@@ -3,6 +3,8 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole } from '@/hooks/useUsers';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -31,6 +33,8 @@ const UsersPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
+  const { user: currentUser } = useAuth();
+
   const { data: users = [], isLoading } = useUsers();
   const { data: stats } = useUserStats();
   const { data: projects = [] } = useProjects();
@@ -51,10 +55,15 @@ const UsersPage = () => {
     return { projects: userProjects.length, numbers: userNumbers.length };
   };
 
-  const handleToggleStatus = (user: User) => {
+  const handleToggleStatus = (targetUser: User) => {
+    if (targetUser.id === currentUser?.id) {
+      toast.error('Você não pode desativar o usuário que está logado');
+      return;
+    }
+
     // If active, set to inactive. Otherwise (pending or inactive), set to active
-    const newStatus = user.status === 'active' ? 'inactive' : 'active';
-    updateStatus.mutate({ userId: user.id, status: newStatus });
+    const newStatus = targetUser.status === 'active' ? 'inactive' : 'active';
+    updateStatus.mutate({ userId: targetUser.id, status: newStatus });
   };
 
   if (isLoading) {
@@ -112,6 +121,11 @@ const UsersPage = () => {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="font-medium">{user.name}</p>
+                          {user.id === currentUser?.id && (
+                            <Badge variant="secondary" className="text-xs">
+                              Você
+                            </Badge>
+                          )}
                           {user.role === 'master' && (
                             <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
                               <Shield className="w-3 h-3 mr-1" />
@@ -128,7 +142,8 @@ const UsersPage = () => {
                       <Switch
                         checked={isActive}
                         onCheckedChange={() => handleToggleStatus(user)}
-                        disabled={updateStatus.isPending}
+                        disabled={updateStatus.isPending || user.id === currentUser?.id}
+                        title={user.id === currentUser?.id ? 'Você não pode desativar o usuário logado' : undefined}
                         className="data-[state=checked]:bg-success data-[state=unchecked]:bg-destructive"
                       />
                       <span className="text-xs text-muted-foreground min-w-[60px]">
