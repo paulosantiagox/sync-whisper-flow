@@ -218,7 +218,22 @@ const ProjectDetail = () => {
           <TableCell><QualityBadge rating={number.qualityRating} /></TableCell>
           <TableCell><span className="text-sm">{number.messagingLimitTier}/dia</span></TableCell>
           <TableCell>
-            {bm ? <div className="text-xs"><p className="font-medium text-foreground">{bm.mainBmName}</p><p className="text-muted-foreground">ID: {bm.mainBmId}</p></div> : <span className="text-xs text-muted-foreground">-</span>}
+            {bm ? (
+              <div className="text-xs space-y-1">
+                <div>
+                  <p className="font-medium text-foreground">{bm.mainBmName}</p>
+                  <p className="text-muted-foreground">ID: {bm.mainBmId}</p>
+                </div>
+                {bm.subBmName && (
+                  <div className="pt-1 border-t border-border">
+                    <p className="text-muted-foreground">WABA: {bm.subBmName}</p>
+                    <p className="text-muted-foreground">ID: {bm.subBmId}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground">-</span>
+            )}
           </TableCell>
           <TableCell>{number.observation ? <span className="text-xs text-muted-foreground line-clamp-2 max-w-[200px]">{number.observation}</span> : <span className="text-xs text-muted-foreground">-</span>}</TableCell>
           <TableCell><span className="text-xs text-muted-foreground">{format(new Date(number.lastChecked), "dd/MM/yy HH:mm", { locale: ptBR })}</span></TableCell>
@@ -283,9 +298,19 @@ const ProjectDetail = () => {
                       {projectBMs.map((bm) => (
                         <div key={bm.id} className="p-3 rounded-lg border bg-card">
                           <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <p className="font-medium text-sm">{bm.mainBmName}</p>
-                              <p className="text-xs text-muted-foreground">ID: {bm.mainBmId}</p>
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs text-muted-foreground">BM Principal</p>
+                                <p className="font-medium text-sm">{bm.mainBmName}</p>
+                                <p className="text-xs text-muted-foreground">ID: {bm.mainBmId}</p>
+                              </div>
+                              {bm.subBmName && (
+                                <div className="pt-2 border-t border-border">
+                                  <p className="text-xs text-muted-foreground">Sub BM (WABA)</p>
+                                  <p className="font-medium text-sm">{bm.subBmName}</p>
+                                  <p className="text-xs text-muted-foreground">ID: {bm.subBmId}</p>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditBM(bm); setIsNewBMOpen(true); setIsBMListOpen(false); }}><Edit2 className="w-4 h-4" /></Button>
