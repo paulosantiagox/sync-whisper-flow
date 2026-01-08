@@ -241,13 +241,13 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
                         <TableCell>{getStatusBadge(entry.qualityRating)}</TableCell>
                         <TableCell className="text-muted-foreground">{entry.messagingLimitTier}</TableCell>
                         <TableCell>
-                          {entry.expectedRecovery ? (
+                          {entry.qualityRating !== 'HIGH' ? (
                             <span className="text-warning">
-                              {format(new Date(entry.expectedRecovery), "dd/MM/yyyy", { locale: ptBR })}
+                              {format(new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000), "dd/MM/yyyy", { locale: ptBR })}
                             </span>
                           ) : '-'}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                        <TableCell className="text-sm text-muted-foreground min-w-[250px]">
                           {entry.observation || '-'}
                         </TableCell>
                       </TableRow>
