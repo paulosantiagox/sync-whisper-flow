@@ -85,13 +85,13 @@ export let businessManagers: BusinessManager[] = [
   {
     id: 'bm1',
     projectId: 'p1',
-    mainBmName: 'BM Principal Loja',
-    mainBmId: '111222333444',
-    subBmName: 'Sub BM Vendas',
-    subBmId: '555666777888',
+    mainBmName: 'Autoflix Treinamentos',
+    mainBmId: '917659149754317',
+    subBmName: 'WABA Autoflix',
+    subBmId: '1338898483886191',
     cardName: 'Visa Final 4242',
     cardLast4: '4242',
-    accessToken: 'EAAxxxxxxxxxxxxxxx',
+    accessToken: 'EAAtSOihZCbZCkBQbaaZC2tNroeSd1GSZCq4JIIsz8LsCeRPrrIM2slMzroHxdVp4Ct3P46Yhk6EC2MaaNS3KVUWZCqVjbCk07dWZBlvTmUtvK1uCHo5QJGgbQOqGNZAjXRnaxBVdp80ZCEmLmX9wLYRWcIZA6Q0cyTwQt498bTRZCqVPCZA3ymP5l8JQbKFEScF9gZDZD',
     createdAt: '2024-04-01T10:00:00Z'
   },
   {
@@ -448,4 +448,10 @@ export const updateBusinessManager = (id: string, data: Partial<BusinessManager>
 
 export const deleteBusinessManager = (id: string) => {
   businessManagers = businessManagers.filter(bm => bm.id !== id);
+};
+
+// WhatsApp Number CRUD
+export const addWhatsAppNumber = (number: WhatsAppNumber) => {
+  whatsappNumbers = [...whatsappNumbers, number];
+  return number;
 };
