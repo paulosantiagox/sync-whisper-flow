@@ -7,6 +7,9 @@ export function useBusinessManagers(projectId?: string) {
   return useQuery({
     queryKey: ['business-managers', projectId],
     queryFn: async () => {
+      console.log('=== DEBUG BMs ===');
+      console.log('ProjectId recebido:', projectId);
+      
       let query = supabase
         .from('business_managers')
         .select('*')
@@ -17,6 +20,9 @@ export function useBusinessManagers(projectId?: string) {
       }
 
       const { data, error } = await query;
+      
+      console.log('Dados retornados:', data);
+      console.log('Erro RLS/Supabase:', error);
 
       if (error) throw error;
       
