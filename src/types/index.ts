@@ -97,6 +97,16 @@ export interface Campaign {
   createdAt: string;
 }
 
+// Campaign Shortcut types
+export interface CampaignShortcut {
+  id: string;
+  campaignId: string;
+  name: string;
+  content: string;
+  isMultiline: boolean;
+  createdAt: string;
+}
+
 // Action Type types
 export interface ActionType {
   id: string;
