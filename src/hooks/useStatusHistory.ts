@@ -69,6 +69,43 @@ export function useCreateStatusHistory() {
   });
 }
 
+// Atualiza apenas o timestamp do último registro de histórico (quando não há mudanças)
+export function useUpdateLastStatusHistory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ phoneNumberId, newTimestamp }: { phoneNumberId: string; newTimestamp: string }) => {
+      // Busca o último registro do número
+      const { data: lastRecord, error: selectError } = await supabase
+        .from('status_history')
+        .select('id')
+        .eq('phone_number_id', phoneNumberId)
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+      if (!lastRecord) return null;
+
+      // Atualiza o timestamp
+      const { error: updateError } = await supabase
+        .from('status_history')
+        .update({ changed_at: newTimestamp })
+        .eq('id', lastRecord.id);
+
+      if (updateError) throw updateError;
+      return lastRecord.id;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['status-history', variables.phoneNumberId] });
+      console.log('[STATUS_HISTORY] Timestamp atualizado com sucesso');
+    },
+    onError: (error) => {
+      console.error('[STATUS_HISTORY] Erro ao atualizar timestamp:', error);
+    },
+  });
+}
+
 // ===================== STATUS CHANGE NOTIFICATIONS =====================
 
 export function useStatusChangeNotifications(phoneNumberId?: string) {

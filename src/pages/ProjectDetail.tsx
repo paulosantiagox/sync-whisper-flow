@@ -5,12 +5,13 @@ import EditNumberModal from '@/components/modals/EditNumberModal';
 import StatusHistoryModal from '@/components/modals/StatusHistoryModal';
 import BMModal from '@/components/modals/BMModal';
 import AddNumberFromMetaModal from '@/components/modals/AddNumberFromMetaModal';
+import UpdateScheduleModal from '@/components/modals/UpdateScheduleModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import QualityBadge from '@/components/dashboard/QualityBadge';
 import { useProject } from '@/hooks/useProjects';
 import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, useDeleteWhatsAppNumber } from '@/hooks/useWhatsAppNumbers';
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
-import { useCreateStatusHistory } from '@/hooks/useStatusHistory';
+import { useCreateStatusHistory, useUpdateLastStatusHistory } from '@/hooks/useStatusHistory';
 import { useCreateStatusChangeNotification, useStatusChangeNotifications, useClearNumberNotifications } from '@/hooks/useStatusHistory';
 import { WhatsAppNumber, BusinessManager, StatusChangeNotification } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
@@ -22,7 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, TrendingUp, TrendingDown, Bell } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, TrendingUp, TrendingDown, Bell, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,6 +48,7 @@ const ProjectDetail = () => {
   const [editBM, setEditBM] = useState<BusinessManager | null>(null);
   const [isNewBMOpen, setIsNewBMOpen] = useState(false);
   const [deleteBM, setDeleteBM] = useState<BusinessManager | null>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   const { data: project, isLoading: projectLoading } = useProject(id || '');
   const { data: numbers = [], isLoading: numbersLoading } = useWhatsAppNumbers(id);
@@ -59,6 +61,7 @@ const ProjectDetail = () => {
   const updateBM = useUpdateBusinessManager();
   const deleteBMMutation = useDeleteBusinessManager();
   const createStatusHistory = useCreateStatusHistory();
+  const updateLastHistory = useUpdateLastStatusHistory();
   const createNotification = useCreateStatusChangeNotification();
   const clearNotifications = useClearNumberNotifications();
 
@@ -137,8 +140,8 @@ const ProjectDetail = () => {
         const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
         const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
 
-        // Regra: cria registro quando houver mudança.
-        // Extra necessário: se ainda não existe nenhum registro, cria o PRIMEIRO registro ("Primeira verificação").
+        // Regra: cria registro quando houver mudança OU primeira verificação
+        // Se não há mudança e já existe histórico, apenas atualiza o timestamp do último registro
         if (hasChanged || !existingHistory.has(number.id)) {
           if (hasChanged) {
             const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
@@ -162,6 +165,7 @@ const ProjectDetail = () => {
               observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
             });
           } else {
+            // Primeira verificação - cria registro inicial
             createStatusHistory.mutate({
               phoneNumberId: number.id,
               qualityRating: newQuality,
@@ -172,6 +176,12 @@ const ProjectDetail = () => {
           }
 
           existingHistory.add(number.id);
+        } else {
+          // Não houve mudança e já existe histórico - apenas atualiza o timestamp do último registro
+          updateLastHistory.mutate({
+            phoneNumberId: number.id,
+            newTimestamp: new Date().toISOString(),
+          });
         }
 
         updateNumber.mutate({
@@ -197,7 +207,7 @@ const ProjectDetail = () => {
     } else {
       toast.success(`${successCount} números verificados com sucesso.`);
     }
-  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification]);
+  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification, updateLastHistory]);
 
   const handleSaveNumber = (numberId: string, data: Partial<WhatsAppNumber>) => {
     updateNumber.mutate({ id: numberId, projectId: id || '', ...data });
@@ -326,6 +336,10 @@ const ProjectDetail = () => {
             {project.description && <p className="text-muted-foreground mt-1">{project.description}</p>}
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setIsScheduleModalOpen(true)}>
+              <Clock className="w-4 h-4 mr-2" />
+              Horários
+            </Button>
             <Button variant="outline" onClick={handleUpdateAllStatus} disabled={isUpdating || numbers.length === 0}>
               {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
               {isUpdating ? 'Atualizando...' : 'Atualizar Status'}
@@ -431,6 +445,7 @@ const ProjectDetail = () => {
       <StatusHistoryModal number={historyNumber} open={!!historyNumber} onOpenChange={(open) => !open && setHistoryNumber(null)} />
       <BMModal bm={editBM} projectId={id || ''} open={isNewBMOpen} onOpenChange={setIsNewBMOpen} onSave={handleSaveBM} existingBMs={projectBMs} />
       <AddNumberFromMetaModal open={isAddNumberModalOpen} onOpenChange={setIsAddNumberModalOpen} projectId={id || ''} businessManagers={projectBMs} onAddNumber={handleAddNumber} />
+      <UpdateScheduleModal projectId={id || ''} open={isScheduleModalOpen} onOpenChange={setIsScheduleModalOpen} />
       <ConfirmDialog open={!!deleteNumber} onOpenChange={(open) => !open && setDeleteNumber(null)} title="Remover Número" description={`Tem certeza que deseja remover o número ${deleteNumber?.displayPhoneNumber}?`} confirmText="Remover" onConfirm={handleDeleteNumber} variant="destructive" />
       <ConfirmDialog open={!!deleteBM} onOpenChange={(open) => !open && setDeleteBM(null)} title="Remover BM" description={`Tem certeza que deseja remover a BM "${deleteBM?.mainBmName}"?`} confirmText="Remover" onConfirm={handleDeleteBM} variant="destructive" />
     </DashboardLayout>
