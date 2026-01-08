@@ -67,6 +67,23 @@ export interface StatusHistory {
   changedAt: string;
   expectedRecovery?: string;
   observation?: string;
+  isError?: boolean;
+  errorMessage?: string;
+}
+
+// Error tracking for numbers
+export interface NumberErrorLog {
+  id: string;
+  phoneNumberId: string;
+  errorMessage: string;
+  attemptedAt: string;
+}
+
+export interface NumberErrorState {
+  phoneNumberId: string;
+  errorCount: number;
+  lastError: string;
+  attempts: NumberErrorLog[];
 }
 
 // Campaign types
