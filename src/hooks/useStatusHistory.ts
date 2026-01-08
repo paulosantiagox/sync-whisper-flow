@@ -60,6 +60,11 @@ export function useCreateStatusHistory() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['status-history', variables.phoneNumberId] });
+      console.log('[STATUS_HISTORY] Histórico criado com sucesso');
+    },
+    onError: (error) => {
+      console.error('[STATUS_HISTORY] Erro ao inserir histórico:', error);
+      toast.error('Erro ao salvar histórico de status');
     },
   });
 }
