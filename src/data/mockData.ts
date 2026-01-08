@@ -1,4 +1,4 @@
-import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager, NumberErrorLog, NumberErrorState } from '@/types';
+import { User, Project, WhatsAppNumber, StatusHistory, Campaign, ActionType, Broadcast, ActivityLog, BusinessManager, NumberErrorLog, NumberErrorState, CampaignShortcut } from '@/types';
 
 export const users: User[] = [
   {
@@ -379,6 +379,50 @@ export let broadcasts: Broadcast[] = [
     createdAt: '2025-01-06T18:00:00Z'
   }
 ];
+
+// Campaign Shortcuts
+export let campaignShortcuts: CampaignShortcut[] = [
+  {
+    id: 'sc1',
+    campaignId: 'c1',
+    name: 'Tag Principal',
+    content: 'L79 LISTA 3',
+    isMultiline: false,
+    createdAt: '2025-01-02T10:00:00Z'
+  },
+  {
+    id: 'sc2',
+    campaignId: 'c1',
+    name: 'Tag Secundária',
+    content: 'L79 INTERESSADOS L3',
+    isMultiline: false,
+    createdAt: '2025-01-02T10:05:00Z'
+  },
+  {
+    id: 'sc3',
+    campaignId: 'c1',
+    name: 'Link Grupo 30',
+    content: 'https://chat.whatsapp.com/exemplo30',
+    isMultiline: false,
+    createdAt: '2025-01-02T10:10:00Z'
+  }
+];
+
+export const addCampaignShortcut = (shortcut: CampaignShortcut) => {
+  campaignShortcuts = [...campaignShortcuts, shortcut];
+  return shortcut;
+};
+
+export const updateCampaignShortcut = (id: string, data: Partial<CampaignShortcut>) => {
+  campaignShortcuts = campaignShortcuts.map(s => 
+    s.id === id ? { ...s, ...data } : s
+  );
+  return campaignShortcuts.find(s => s.id === id);
+};
+
+export const deleteCampaignShortcut = (id: string) => {
+  campaignShortcuts = campaignShortcuts.filter(s => s.id !== id);
+};
 
 export const activityLogs: ActivityLog[] = [
   { id: 'al1', userId: '2', action: 'login', details: 'Login realizado com sucesso', timestamp: '2025-01-07T08:30:00Z' },

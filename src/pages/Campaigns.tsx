@@ -3,9 +3,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import BroadcastModal from '@/components/modals/BroadcastModal';
 import ActionTypeModal from '@/components/modals/ActionTypeModal';
+import ShortcutModal from '@/components/modals/ShortcutModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
-import { campaigns, actionTypes, broadcasts, whatsappNumbers, projects, addBroadcast, updateBroadcast, deleteBroadcast, addActionType, updateActionType, deleteActionType } from '@/data/mockData';
-import { Broadcast, ActionType, BroadcastStatus } from '@/types';
+import { 
+  campaigns, actionTypes, broadcasts, whatsappNumbers, projects, 
+  addBroadcast, updateBroadcast, deleteBroadcast, 
+  addActionType, updateActionType, deleteActionType,
+  campaignShortcuts, addCampaignShortcut, updateCampaignShortcut, deleteCampaignShortcut
+} from '@/data/mockData';
+import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +20,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Megaphone, Send, Calendar, ChevronRight, Users, MessageCircle, Edit2, Trash2, Tag, Filter, Settings } from 'lucide-react';
+import { 
+  Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Users, MessageCircle, 
+  Edit2, Trash2, Tag, Filter, Copy, Zap, Check
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -36,12 +47,19 @@ const Campaigns = () => {
   const [accountFilter, setAccountFilter] = useState('all');
   const [, forceUpdate] = useState({});
 
+  // Collapsible states
+  const [campaignsOpen, setCampaignsOpen] = useState(true);
+  const [shortcutsOpen, setShortcutsOpen] = useState(true);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   // Modal states
   const [editBroadcast, setEditBroadcast] = useState<Broadcast | null>(null);
   const [isNewBroadcastOpen, setIsNewBroadcastOpen] = useState(false);
   const [editActionType, setEditActionType] = useState<ActionType | null>(null);
   const [isNewActionTypeOpen, setIsNewActionTypeOpen] = useState(false);
-  const [deleteItem, setDeleteItem] = useState<{ type: 'broadcast' | 'actionType'; item: any } | null>(null);
+  const [editShortcut, setEditShortcut] = useState<CampaignShortcut | null>(null);
+  const [isNewShortcutOpen, setIsNewShortcutOpen] = useState(false);
+  const [deleteItem, setDeleteItem] = useState<{ type: 'broadcast' | 'actionType' | 'shortcut'; item: any } | null>(null);
 
   const userCampaigns = campaigns.filter(c => c.userId === user?.id);
   const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : userCampaigns[0];
@@ -54,6 +72,7 @@ const Campaigns = () => {
   }, [activeCampaign?.id, typeFilter, accountFilter]);
 
   const campaignActionTypes = actionTypes.filter(at => at.campaignId === activeCampaign?.id);
+  const shortcuts = campaignShortcuts.filter(s => s.campaignId === activeCampaign?.id);
   
   // Get all WhatsApp numbers from user's projects
   const userProjects = projects.filter(p => p.userId === user?.id);
@@ -83,6 +102,17 @@ const Campaigns = () => {
     forceUpdate({});
   };
 
+  const handleSaveShortcut = (shortcut: CampaignShortcut) => {
+    if (editShortcut) {
+      updateCampaignShortcut(shortcut.id, shortcut);
+      toast({ title: "Atalho atualizado!" });
+    } else {
+      addCampaignShortcut(shortcut);
+      toast({ title: "Atalho criado!" });
+    }
+    forceUpdate({});
+  };
+
   const handleDelete = () => {
     if (deleteItem?.type === 'broadcast') {
       deleteBroadcast(deleteItem.item.id);
@@ -90,6 +120,9 @@ const Campaigns = () => {
     } else if (deleteItem?.type === 'actionType') {
       deleteActionType(deleteItem.item.id);
       toast({ title: "Tipo de ação removido!" });
+    } else if (deleteItem?.type === 'shortcut') {
+      deleteCampaignShortcut(deleteItem.item.id);
+      toast({ title: "Atalho removido!" });
     }
     setDeleteItem(null);
     forceUpdate({});
@@ -99,6 +132,17 @@ const Campaigns = () => {
     updateBroadcast(broadcastId, { status: newStatus });
     forceUpdate({});
     toast({ title: "Status atualizado!" });
+  };
+
+  const handleCopyContent = async (shortcut: CampaignShortcut) => {
+    try {
+      await navigator.clipboard.writeText(shortcut.content);
+      setCopiedId(shortcut.id);
+      toast({ title: "Copiado!", description: `"${shortcut.name}" copiado para a área de transferência.` });
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast({ title: "Erro ao copiar", variant: "destructive" });
+    }
   };
 
   const getStatusOption = (status: BroadcastStatus) => {
@@ -197,17 +241,136 @@ const Campaigns = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Campaigns Sidebar */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-4">
+          {/* Minhas Campanhas - Collapsible Dropdown */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-base">Minhas Campanhas</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {userCampaigns.length > 0 ? userCampaigns.map((campaign) => (
-                <button key={campaign.id} onClick={() => setSelectedCampaign(campaign.id)} className={`w-full p-3 rounded-lg text-left transition-all ${activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
-                  <div className="flex items-center justify-between"><div><p className="font-medium text-sm">{campaign.name}</p><p className={`text-xs ${activeCampaign?.id === campaign.id ? 'opacity-80' : 'text-muted-foreground'}`}>{broadcasts.filter(b => b.campaignId === campaign.id).length} disparos</p></div><ChevronRight className="w-4 h-4" /></div>
-                </button>
-              )) : <div className="text-center py-6"><Megaphone className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" /><p className="text-sm text-muted-foreground">Nenhuma campanha</p></div>}
-            </CardContent>
+            <Collapsible open={campaignsOpen} onOpenChange={setCampaignsOpen}>
+              <CardHeader className="pb-2">
+                <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Megaphone className="w-4 h-4" />
+                    Minhas Campanhas
+                  </CardTitle>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${campaignsOpen ? '' : '-rotate-90'}`} />
+                </CollapsibleTrigger>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-2 pt-0">
+                  {userCampaigns.length > 0 ? userCampaigns.map((campaign) => (
+                    <button 
+                      key={campaign.id} 
+                      onClick={() => setSelectedCampaign(campaign.id)} 
+                      className={`w-full p-3 rounded-lg text-left transition-all ${activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{campaign.name}</p>
+                          <p className={`text-xs ${activeCampaign?.id === campaign.id ? 'opacity-80' : 'text-muted-foreground'}`}>
+                            {broadcasts.filter(b => b.campaignId === campaign.id).length} disparos
+                          </p>
+                        </div>
+                        <ChevronRight className="w-4 h-4" />
+                      </div>
+                    </button>
+                  )) : (
+                    <div className="text-center py-6">
+                      <Megaphone className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">Nenhuma campanha</p>
+                    </div>
+                  )}
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
           </Card>
+
+          {/* Atalhos Rápidos - Collapsible */}
+          {activeCampaign && (
+            <Card>
+              <Collapsible open={shortcutsOpen} onOpenChange={setShortcutsOpen}>
+                <CardHeader className="pb-2">
+                  <CollapsibleTrigger className="flex items-center justify-between w-full hover:bg-muted/50 -mx-2 px-2 py-1 rounded-md transition-colors">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Zap className="w-4 h-4" />
+                      Atalhos Rápidos
+                    </CardTitle>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${shortcutsOpen ? '' : '-rotate-90'}`} />
+                  </CollapsibleTrigger>
+                </CardHeader>
+                <CollapsibleContent>
+                  <CardContent className="space-y-2 pt-0">
+                    {shortcuts.length > 0 ? (
+                      <>
+                        {shortcuts.map((shortcut) => (
+                          <div 
+                            key={shortcut.id} 
+                            className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm text-foreground">{shortcut.name}</p>
+                                <p className={`text-xs text-muted-foreground mt-1 ${shortcut.isMultiline ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                                  {shortcut.content}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleCopyContent(shortcut)}
+                                >
+                                  {copiedId === shortcut.id ? (
+                                    <Check className="w-3.5 h-3.5 text-success" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5" />
+                                  )}
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                      <Edit2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-popover">
+                                    <DropdownMenuItem onClick={() => { setEditShortcut(shortcut); setIsNewShortcutOpen(true); }}>
+                                      <Edit2 className="w-4 h-4 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      className="text-destructive focus:text-destructive"
+                                      onClick={() => setDeleteItem({ type: 'shortcut', item: shortcut })}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Excluir
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      <div className="text-center py-4">
+                        <Zap className="w-8 h-8 mx-auto text-muted-foreground/50 mb-2" />
+                        <p className="text-xs text-muted-foreground">Nenhum atalho</p>
+                      </div>
+                    )}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-2"
+                      onClick={() => { setEditShortcut(null); setIsNewShortcutOpen(true); }}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Novo Atalho
+                    </Button>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          )}
         </div>
 
         {/* Campaign Content */}
@@ -216,9 +379,39 @@ const Campaigns = () => {
             <div className="space-y-6">
               {/* Stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center"><Send className="w-5 h-5 text-primary-foreground" /></div><div><p className="text-2xl font-bold">{campaignBroadcasts.length}</p><p className="text-xs text-muted-foreground">Disparos Realizados</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center"><Users className="w-5 h-5 text-success-foreground" /></div><div><p className="text-2xl font-bold">{getTotalContacts().toLocaleString()}</p><p className="text-xs text-muted-foreground">Contatos Impactados</p></div></div></Card>
-                <Card className="p-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-accent" /></div><div><p className="text-2xl font-bold">{campaignActionTypes.length}</p><p className="text-xs text-muted-foreground">Tipos de Ação</p></div></div></Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
+                      <Send className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{campaignBroadcasts.length}</p>
+                      <p className="text-xs text-muted-foreground">Disparos Realizados</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg gradient-success flex items-center justify-center">
+                      <Users className="w-5 h-5 text-success-foreground" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{getTotalContacts().toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">Contatos Impactados</p>
+                    </div>
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
+                      <MessageCircle className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold">{campaignActionTypes.length}</p>
+                      <p className="text-xs text-muted-foreground">Tipos de Ação</p>
+                    </div>
+                  </div>
+                </Card>
               </div>
 
               {/* Broadcasts Table */}
@@ -227,14 +420,32 @@ const Campaigns = () => {
                   <CardTitle>Disparos</CardTitle>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger className="w-[150px]"><Filter className="w-4 h-4 mr-2" /><SelectValue placeholder="Tipo" /></SelectTrigger>
-                      <SelectContent><SelectItem value="all">Todos os tipos</SelectItem>{campaignActionTypes.map(at => <SelectItem key={at.id} value={at.id}>{at.name}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="w-[150px]">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        {campaignActionTypes.map(at => (
+                          <SelectItem key={at.id} value={at.id}>{at.name}</SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                     <Select value={accountFilter} onValueChange={setAccountFilter}>
-                      <SelectTrigger className="w-[180px]"><SelectValue placeholder="Conta" /></SelectTrigger>
-                      <SelectContent><SelectItem value="all">Todas as contas</SelectItem>{userNumbers.map(n => <SelectItem key={n.id} value={n.id}>{n.customName || n.verifiedName}</SelectItem>)}</SelectContent>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Conta" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        <SelectItem value="all">Todas as contas</SelectItem>
+                        {userNumbers.map(n => (
+                          <SelectItem key={n.id} value={n.id}>{n.customName || n.verifiedName}</SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
-                    <Button size="sm" onClick={() => { setEditBroadcast(null); setIsNewBroadcastOpen(true); }}><Plus className="w-4 h-4 mr-1" />Registrar Disparo</Button>
+                    <Button size="sm" onClick={() => { setEditBroadcast(null); setIsNewBroadcastOpen(true); }}>
+                      <Plus className="w-4 h-4 mr-1" />
+                      Registrar Disparo
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -261,9 +472,18 @@ const Campaigns = () => {
                             const currentStatus = getStatusOption(broadcast.status);
                             return (
                               <TableRow key={broadcast.id}>
-                                <TableCell><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /><span>{format(new Date(broadcast.date), "dd/MM", { locale: ptBR })} {broadcast.time}</span></div></TableCell>
-                                <TableCell><Badge style={{ backgroundColor: actionType?.color }}>{actionType?.name || 'N/A'}</Badge></TableCell>
-                                <TableCell className="text-muted-foreground text-sm">{phoneNum?.customName || phoneNum?.displayPhoneNumber || 'N/A'}</TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                                    <span>{format(new Date(broadcast.date), "dd/MM", { locale: ptBR })} {broadcast.time}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge style={{ backgroundColor: actionType?.color }}>{actionType?.name || 'N/A'}</Badge>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {phoneNum?.customName || phoneNum?.displayPhoneNumber || 'N/A'}
+                                </TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.templateUsed}</TableCell>
                                 <TableCell>
@@ -282,7 +502,7 @@ const Campaigns = () => {
                                     <SelectTrigger className={`w-[140px] h-8 text-xs ${currentStatus.color}`}>
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-popover">
                                       {statusOptions.map((option) => (
                                         <SelectItem key={option.value} value={option.value}>
                                           {option.label}
@@ -293,8 +513,22 @@ const Campaigns = () => {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditBroadcast(broadcast); setIsNewBroadcastOpen(true); }}><Edit2 className="w-4 h-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteItem({ type: 'broadcast', item: broadcast })}><Trash2 className="w-4 h-4" /></Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8" 
+                                      onClick={() => { setEditBroadcast(broadcast); setIsNewBroadcastOpen(true); }}
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-destructive" 
+                                      onClick={() => setDeleteItem({ type: 'broadcast', item: broadcast })}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
                                   </div>
                                 </TableCell>
                               </TableRow>
@@ -303,7 +537,12 @@ const Campaigns = () => {
                         </TableBody>
                       </Table>
                     </div>
-                  ) : <div className="text-center py-8"><Send className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" /><p className="text-muted-foreground">Nenhum disparo registrado</p></div>}
+                  ) : (
+                    <div className="text-center py-8">
+                      <Send className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-muted-foreground">Nenhum disparo registrado</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -312,16 +551,56 @@ const Campaigns = () => {
               <Megaphone className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
               <h3 className="font-medium text-lg mb-2">Nenhuma campanha selecionada</h3>
               <p className="text-muted-foreground mb-4">Crie sua primeira campanha para começar a registrar seus disparos.</p>
-              <Button className="gradient-primary" onClick={() => setIsNewCampaignOpen(true)}><Plus className="w-4 h-4 mr-2" />Criar Primeira Campanha</Button>
+              <Button className="gradient-primary" onClick={() => setIsNewCampaignOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Criar Primeira Campanha
+              </Button>
             </Card>
           )}
         </div>
       </div>
 
       {/* Modals */}
-      <BroadcastModal broadcast={editBroadcast} campaignId={activeCampaign?.id || ''} actionTypes={campaignActionTypes} whatsappNumbers={userNumbers} open={isNewBroadcastOpen} onOpenChange={setIsNewBroadcastOpen} onSave={handleSaveBroadcast} />
-      <ActionTypeModal actionType={editActionType} campaignId={activeCampaign?.id || ''} open={isNewActionTypeOpen} onOpenChange={setIsNewActionTypeOpen} onSave={handleSaveActionType} />
-      <ConfirmDialog open={!!deleteItem} onOpenChange={(open) => !open && setDeleteItem(null)} title={deleteItem?.type === 'broadcast' ? 'Remover Disparo' : 'Remover Tipo de Ação'} description={deleteItem?.type === 'broadcast' ? 'Tem certeza que deseja remover este disparo?' : 'Tem certeza que deseja remover este tipo de ação?'} confirmText="Remover" onConfirm={handleDelete} variant="destructive" />
+      <BroadcastModal 
+        broadcast={editBroadcast} 
+        campaignId={activeCampaign?.id || ''} 
+        actionTypes={campaignActionTypes} 
+        whatsappNumbers={userNumbers} 
+        open={isNewBroadcastOpen} 
+        onOpenChange={setIsNewBroadcastOpen} 
+        onSave={handleSaveBroadcast} 
+      />
+      <ActionTypeModal 
+        actionType={editActionType} 
+        campaignId={activeCampaign?.id || ''} 
+        open={isNewActionTypeOpen} 
+        onOpenChange={setIsNewActionTypeOpen} 
+        onSave={handleSaveActionType} 
+      />
+      <ShortcutModal
+        shortcut={editShortcut}
+        campaignId={activeCampaign?.id || ''}
+        open={isNewShortcutOpen}
+        onOpenChange={setIsNewShortcutOpen}
+        onSave={handleSaveShortcut}
+      />
+      <ConfirmDialog 
+        open={!!deleteItem} 
+        onOpenChange={(open) => !open && setDeleteItem(null)} 
+        title={
+          deleteItem?.type === 'broadcast' ? 'Remover Disparo' : 
+          deleteItem?.type === 'actionType' ? 'Remover Tipo de Ação' : 
+          'Remover Atalho'
+        } 
+        description={
+          deleteItem?.type === 'broadcast' ? 'Tem certeza que deseja remover este disparo?' : 
+          deleteItem?.type === 'actionType' ? 'Tem certeza que deseja remover este tipo de ação?' :
+          'Tem certeza que deseja remover este atalho?'
+        } 
+        confirmText="Remover" 
+        onConfirm={handleDelete} 
+        variant="destructive" 
+      />
     </DashboardLayout>
   );
 };
