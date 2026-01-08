@@ -95,9 +95,33 @@ export function useUpdateCampaign() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campanha atualizada!');
     },
     onError: (error) => {
       toast.error('Erro ao atualizar campanha');
+      console.error(error);
+    },
+  });
+}
+
+export function useDeleteCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+      toast.success('Campanha removida!');
+    },
+    onError: (error) => {
+      toast.error('Erro ao remover campanha');
       console.error(error);
     },
   });
