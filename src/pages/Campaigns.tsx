@@ -6,7 +6,7 @@ import ActionTypeModal from '@/components/modals/ActionTypeModal';
 import ShortcutModal from '@/components/modals/ShortcutModal';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import QualitySummary from '@/components/dashboard/QualitySummary';
-import { useCampaigns, useCreateCampaign, useUpdateCampaign, useBroadcasts, useCreateBroadcast, useUpdateBroadcast, useDeleteBroadcast, useActionTypes, useCreateActionType, useUpdateActionType, useDeleteActionType, useShortcuts, useCreateShortcut, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useCampaigns';
+import { useCampaigns, useCreateCampaign, useUpdateCampaign, useDeleteCampaign, useBroadcasts, useCreateBroadcast, useUpdateBroadcast, useDeleteBroadcast, useActionTypes, useCreateActionType, useUpdateActionType, useDeleteActionType, useShortcuts, useCreateShortcut, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useCampaigns';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut, Campaign } from '@/types';
@@ -49,16 +49,21 @@ const Campaigns = () => {
   const [isNewActionTypeOpen, setIsNewActionTypeOpen] = useState(false);
   const [editShortcut, setEditShortcut] = useState<CampaignShortcut | null>(null);
   const [isNewShortcutOpen, setIsNewShortcutOpen] = useState(false);
-  const [deleteItem, setDeleteItem] = useState<{ type: 'broadcast' | 'actionType' | 'shortcut'; item: any } | null>(null);
+  const [deleteItem, setDeleteItem] = useState<{ type: 'broadcast' | 'actionType' | 'shortcut' | 'campaign'; item: any } | null>(null);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newCampaignDescription, setNewCampaignDescription] = useState('');
   const [newCampaignProjectId, setNewCampaignProjectId] = useState('');
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
+  const [isEditCampaignOpen, setIsEditCampaignOpen] = useState(false);
+  const [editCampaignName, setEditCampaignName] = useState('');
+  const [editCampaignDescription, setEditCampaignDescription] = useState('');
 
   const { data: campaigns = [], isLoading: campaignsLoading } = useCampaigns();
   const { data: projects = [] } = useProjects();
   const { data: allNumbers = [] } = useAllWhatsAppNumbers();
   const createCampaign = useCreateCampaign();
   const updateCampaign = useUpdateCampaign();
+  const deleteCampaign = useDeleteCampaign();
 
   const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : campaigns[0];
   const { data: broadcasts = [] } = useBroadcasts(activeCampaign?.id);
@@ -133,8 +138,32 @@ const Campaigns = () => {
       deleteActionTypeMutation.mutate({ id: deleteItem.item.id, campaignId: activeCampaign?.id || '' });
     } else if (deleteItem?.type === 'shortcut') {
       deleteShortcutMutation.mutate({ id: deleteItem.item.id, campaignId: activeCampaign?.id || '' });
+    } else if (deleteItem?.type === 'campaign') {
+      deleteCampaign.mutate(deleteItem.item.id);
+      if (selectedCampaign === deleteItem.item.id) {
+        setSelectedCampaign(null);
+      }
     }
     setDeleteItem(null);
+  };
+
+  const handleEditCampaignOpen = (campaign: Campaign) => {
+    setEditCampaign(campaign);
+    setEditCampaignName(campaign.name);
+    setEditCampaignDescription(campaign.description || '');
+    setIsEditCampaignOpen(true);
+  };
+
+  const handleEditCampaignSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCampaign || !editCampaignName.trim()) return;
+    updateCampaign.mutate({ 
+      id: editCampaign.id, 
+      name: editCampaignName.trim(), 
+      description: editCampaignDescription.trim() || undefined 
+    });
+    setIsEditCampaignOpen(false);
+    setEditCampaign(null);
   };
 
   const handleStatusChange = (broadcastId: string, newStatus: BroadcastStatus) => {
@@ -196,12 +225,35 @@ const Campaigns = () => {
               <CollapsibleContent>
                 <CardContent className="space-y-2 pt-0">
                   {campaigns.length > 0 ? campaigns.map((campaign) => (
-                    <button key={campaign.id} onClick={() => setSelectedCampaign(campaign.id)} className={`w-full p-3 rounded-lg text-left transition-all ${activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
+                    <div key={campaign.id} className={`p-3 rounded-lg transition-all group ${activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
                       <div className="flex items-center justify-between">
-                        <div><p className="font-medium text-sm">{campaign.name}</p><p className={`text-xs ${activeCampaign?.id === campaign.id ? 'opacity-80' : 'text-muted-foreground'}`}>{broadcasts.filter(b => b.campaignId === campaign.id).length} disparos</p></div>
-                        <ChevronRight className="w-4 h-4" />
+                        <button onClick={() => setSelectedCampaign(campaign.id)} className="flex-1 text-left">
+                          <p className="font-medium text-sm">{campaign.name}</p>
+                          <p className={`text-xs ${activeCampaign?.id === campaign.id ? 'opacity-80' : 'text-muted-foreground'}`}>{broadcasts.filter(b => b.campaignId === campaign.id).length} disparos</p>
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className={`h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity ${activeCampaign?.id === campaign.id ? 'hover:bg-primary-foreground/20' : ''}`}>
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover">
+                              <DropdownMenuItem onClick={() => handleEditCampaignOpen(campaign)}>
+                                <Edit2 className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDeleteItem({ type: 'campaign', item: campaign })}>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
                       </div>
-                    </button>
+                    </div>
                   )) : (
                     <div className="text-center py-6"><Megaphone className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" /><p className="text-sm text-muted-foreground">Nenhuma campanha</p></div>
                   )}
@@ -349,7 +401,60 @@ const Campaigns = () => {
       <BroadcastModal broadcast={editBroadcast} campaignId={activeCampaign?.id || ''} actionTypes={actionTypes} whatsappNumbers={userNumbers} open={isNewBroadcastOpen} onOpenChange={setIsNewBroadcastOpen} onSave={handleSaveBroadcast} />
       <ActionTypeModal actionType={editActionType} campaignId={activeCampaign?.id || ''} open={isNewActionTypeOpen} onOpenChange={setIsNewActionTypeOpen} onSave={handleSaveActionType} />
       <ShortcutModal shortcut={editShortcut} campaignId={activeCampaign?.id || ''} open={isNewShortcutOpen} onOpenChange={setIsNewShortcutOpen} onSave={handleSaveShortcut} />
-      <ConfirmDialog open={!!deleteItem} onOpenChange={(open) => !open && setDeleteItem(null)} title={deleteItem?.type === 'broadcast' ? 'Remover Disparo' : deleteItem?.type === 'actionType' ? 'Remover Tipo de Ação' : 'Remover Atalho'} description={deleteItem?.type === 'broadcast' ? 'Tem certeza que deseja remover este disparo?' : deleteItem?.type === 'actionType' ? 'Tem certeza que deseja remover este tipo de ação?' : 'Tem certeza que deseja remover este atalho?'} confirmText="Remover" onConfirm={handleDelete} variant="destructive" />
+      <ConfirmDialog 
+        open={!!deleteItem} 
+        onOpenChange={(open) => !open && setDeleteItem(null)} 
+        title={
+          deleteItem?.type === 'broadcast' ? 'Remover Disparo' : 
+          deleteItem?.type === 'actionType' ? 'Remover Tipo de Ação' : 
+          deleteItem?.type === 'campaign' ? 'Remover Campanha' :
+          'Remover Atalho'
+        } 
+        description={
+          deleteItem?.type === 'broadcast' ? 'Tem certeza que deseja remover este disparo?' : 
+          deleteItem?.type === 'actionType' ? 'Tem certeza que deseja remover este tipo de ação?' : 
+          deleteItem?.type === 'campaign' ? `Tem certeza que deseja remover a campanha "${deleteItem.item.name}"? Todos os disparos, tipos de ação e atalhos serão removidos.` :
+          'Tem certeza que deseja remover este atalho?'
+        } 
+        confirmText="Remover" 
+        onConfirm={handleDelete} 
+        variant="destructive" 
+      />
+
+      {/* Edit Campaign Dialog */}
+      <Dialog open={isEditCampaignOpen} onOpenChange={setIsEditCampaignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Campanha</DialogTitle>
+          </DialogHeader>
+          <form className="space-y-4 mt-4" onSubmit={handleEditCampaignSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="edit-campaign-name">Nome da Campanha</Label>
+              <Input 
+                id="edit-campaign-name" 
+                value={editCampaignName} 
+                onChange={(e) => setEditCampaignName(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-campaign-description">Descrição</Label>
+              <Input 
+                id="edit-campaign-description" 
+                value={editCampaignDescription} 
+                onChange={(e) => setEditCampaignDescription(e.target.value)} 
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsEditCampaignOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" className="gradient-primary">
+                Salvar
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 };

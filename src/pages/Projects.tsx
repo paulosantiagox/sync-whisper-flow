@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProjectCard from '@/components/dashboard/ProjectCard';
-import { useProjects, useCreateProject } from '@/hooks/useProjects';
+import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,16 @@ const Projects = () => {
   const { data: projects = [], isLoading } = useProjects();
   const { data: allNumbers = [] } = useAllWhatsAppNumbers();
   const createProject = useCreateProject();
+  const updateProject = useUpdateProject();
+  const deleteProject = useDeleteProject();
+
+  const handleEditProject = (project: any, data: { name: string; description?: string }) => {
+    updateProject.mutate({ id: project.id, ...data });
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    deleteProject.mutate(projectId);
+  };
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +104,12 @@ const Projects = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project, index) => (
             <div key={project.id} style={{ animationDelay: `${index * 0.1}s` }}>
-              <ProjectCard project={project} numbers={allNumbers.filter(n => n.projectId === project.id)} />
+              <ProjectCard 
+                project={project} 
+                numbers={allNumbers.filter(n => n.projectId === project.id)} 
+                onEdit={handleEditProject}
+                onDelete={handleDeleteProject}
+              />
             </div>
           ))}
         </div>
