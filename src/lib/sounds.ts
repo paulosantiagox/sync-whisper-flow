@@ -2,13 +2,42 @@
 // Creates a pleasant "ding" sound without external files
 
 let audioContext: AudioContext | null = null;
+let isAudioEnabled = false;
 
-const getAudioContext = () => {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+const getAudioContext = (): AudioContext | null => {
+  try {
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    return audioContext;
+  } catch {
+    return null;
   }
-  return audioContext;
 };
+
+// Enable audio after user interaction (required by browser policies)
+const enableAudio = () => {
+  if (!isAudioEnabled) {
+    const ctx = getAudioContext();
+    if (ctx) {
+      isAudioEnabled = true;
+    }
+  }
+};
+
+// Listen for user interaction to enable audio
+if (typeof window !== 'undefined') {
+  const events = ['click', 'touchstart', 'keydown'];
+  const handler = () => {
+    enableAudio();
+    events.forEach(e => document.removeEventListener(e, handler));
+  };
+  events.forEach(e => document.addEventListener(e, handler, { once: true }));
+}
 
 export type NotificationSoundType = 'success' | 'error' | 'warning' | 'info';
 
@@ -22,6 +51,8 @@ const soundConfigs: Record<NotificationSoundType, { frequency: number; duration:
 export const playNotificationSound = (type: NotificationSoundType = 'info') => {
   try {
     const ctx = getAudioContext();
+    if (!ctx) return;
+    
     const config = soundConfigs[type];
     
     // Create oscillator for the tone
