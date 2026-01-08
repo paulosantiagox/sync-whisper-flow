@@ -33,7 +33,7 @@ import { ptBR } from 'date-fns/locale';
 
 const statusOptions: { value: BroadcastStatus; label: string; color: string }[] = [
   { value: 'preparing', label: 'Em preparação', color: 'bg-muted text-muted-foreground' },
-  { value: 'scheduled', label: 'Agendado', color: 'bg-blue-500 text-white' },
+  { value: 'scheduled', label: 'Agendado', color: 'bg-yellow-500 text-white' },
   { value: 'cancelled', label: 'Cancelado', color: 'bg-destructive text-destructive-foreground' },
   { value: 'sent', label: 'Enviado', color: 'bg-success text-success-foreground' },
 ];
@@ -191,69 +191,6 @@ const Campaigns = () => {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-2xl font-bold text-foreground">Campanhas de Disparo</h1>
           <div className="flex items-center gap-2">
-            <Dialog open={isActionTypesOpen} onOpenChange={setIsActionTypesOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Tag className="w-4 h-4 mr-2" />
-                  Tipos de Ação
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Tag className="w-5 h-5" />
-                    Tipos de Ação
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="mt-4 space-y-4">
-                  <div className="flex justify-end">
-                    <Button size="sm" onClick={() => { setEditActionType(null); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      Novo Tipo
-                    </Button>
-                  </div>
-                  {campaignActionTypes.length > 0 ? (
-                    <div className="space-y-2">
-                      {campaignActionTypes.map((at) => (
-                        <div key={at.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                          <div className="flex items-center gap-3">
-                            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: at.color }} />
-                            <span className="font-medium">{at.name}</span>
-                            {at.description && (
-                              <span className="text-sm text-muted-foreground">- {at.description}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8"
-                              onClick={() => { setEditActionType(at); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}
-                            >
-                              <Edit2 className="w-4 h-4" />
-                            </Button>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => { setDeleteItem({ type: 'actionType', item: at }); setIsActionTypesOpen(false); }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Tag className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-                      <p className="text-sm text-muted-foreground">Nenhum tipo cadastrado</p>
-                      <p className="text-xs text-muted-foreground">Crie seu primeiro tipo de ação</p>
-                    </div>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
             <Dialog open={isNewCampaignOpen} onOpenChange={setIsNewCampaignOpen}>
               <DialogTrigger asChild>
                 <Button className="gradient-primary">
@@ -497,6 +434,69 @@ const Campaigns = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Dialog open={isActionTypesOpen} onOpenChange={setIsActionTypesOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Tag className="w-4 h-4 mr-1" />
+                          Tipos de Ação
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Tag className="w-5 h-5" />
+                            Tipos de Ação
+                          </DialogTitle>
+                        </DialogHeader>
+                        <div className="mt-4 space-y-4">
+                          <div className="flex justify-end">
+                            <Button size="sm" onClick={() => { setEditActionType(null); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}>
+                              <Plus className="w-4 h-4 mr-1" />
+                              Novo Tipo
+                            </Button>
+                          </div>
+                          {campaignActionTypes.length > 0 ? (
+                            <div className="space-y-2">
+                              {campaignActionTypes.map((at) => (
+                                <div key={at.id} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: at.color }} />
+                                    <span className="font-medium">{at.name}</span>
+                                    {at.description && (
+                                      <span className="text-sm text-muted-foreground">- {at.description}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8"
+                                      onClick={() => { setEditActionType(at); setIsNewActionTypeOpen(true); setIsActionTypesOpen(false); }}
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="icon" 
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={() => { setDeleteItem({ type: 'actionType', item: at }); setIsActionTypesOpen(false); }}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <Tag className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                              <p className="text-sm text-muted-foreground">Nenhum tipo cadastrado</p>
+                              <p className="text-xs text-muted-foreground">Crie seu primeiro tipo de ação</p>
+                            </div>
+                          )}
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <Button size="sm" onClick={() => { setEditBroadcast(null); setIsNewBroadcastOpen(true); }}>
                       <Plus className="w-4 h-4 mr-1" />
                       Registrar Disparo
