@@ -41,7 +41,7 @@ const UsersPage = () => {
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || u.status === statusFilter;
-    return matchesSearch && matchesStatus && u.role !== 'master';
+    return matchesSearch && matchesStatus;
   });
 
   const getUserStats = (userId: string) => {
@@ -109,7 +109,15 @@ const UsersPage = () => {
                         <span className="text-sm font-medium text-primary">{user.name.charAt(0).toUpperCase()}</span>
                       </div>
                       <div>
-                        <p className="font-medium">{user.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{user.name}</p>
+                          {user.role === 'master' && (
+                            <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
+                              <Shield className="w-3 h-3 mr-1" />
+                              Admin
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
