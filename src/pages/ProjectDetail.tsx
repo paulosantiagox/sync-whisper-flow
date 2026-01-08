@@ -14,6 +14,7 @@ import { useCreateStatusHistory } from '@/hooks/useStatusHistory';
 import { useCreateStatusChangeNotification, useStatusChangeNotifications, useClearNumberNotifications } from '@/hooks/useStatusHistory';
 import { WhatsAppNumber, BusinessManager, StatusChangeNotification } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -95,9 +96,36 @@ const ProjectDetail = () => {
 
   const handleUpdateAllStatus = useCallback(async () => {
     if (numbers.length === 0) return;
+
     setIsUpdating(true);
     let successCount = 0;
     let errorCount = 0;
+
+    // Cache: quais números já possuem histórico (para registrar a primeira verificação mesmo sem mudança)
+    const existingHistory = new Set<string>();
+    try {
+      const ids = numbers.map(n => n.id);
+      const chunkSize = 100;
+
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        const chunk = ids.slice(i, i + chunkSize);
+        const { data, error } = await supabase
+          .from('status_history')
+          .select('phone_number_id')
+          .in('phone_number_id', chunk);
+
+        if (error) {
+          console.error('[STATUS_HISTORY] Erro ao carregar histórico existente:', error);
+          break;
+        }
+
+        (data || []).forEach((r: any) => {
+          if (r?.phone_number_id) existingHistory.add(r.phone_number_id);
+        });
+      }
+    } catch (e) {
+      console.error('[STATUS_HISTORY] Falha ao preparar cache de histórico:', e);
+    }
 
     for (const number of numbers) {
       const bm = projectBMs.find(b => b.id === number.businessManagerId);
@@ -109,27 +137,41 @@ const ProjectDetail = () => {
         const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
         const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
 
-        if (hasChanged) {
-          const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-          const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
+        // Regra: cria registro quando houver mudança.
+        // Extra necessário: se ainda não existe nenhum registro, cria o PRIMEIRO registro ("Primeira verificação").
+        if (hasChanged || !existingHistory.has(number.id)) {
+          if (hasChanged) {
+            const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+            const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
 
-          createNotification.mutate({
-            phoneNumberId: number.id,
-            projectId: id || '',
-            previousQuality: number.qualityRating,
-            newQuality: newQuality,
-            direction: direction as 'up' | 'down',
-            changedAt: new Date().toISOString(),
-          });
+            createNotification.mutate({
+              phoneNumberId: number.id,
+              projectId: id || '',
+              previousQuality: number.qualityRating,
+              newQuality: newQuality,
+              direction: direction as 'up' | 'down',
+              changedAt: new Date().toISOString(),
+            });
 
-          createStatusHistory.mutate({
-            phoneNumberId: number.id,
-            qualityRating: newQuality,
-            messagingLimitTier: newLimit,
-            previousQuality: number.qualityRating,
-            changedAt: new Date().toISOString(),
-            observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
-          });
+            createStatusHistory.mutate({
+              phoneNumberId: number.id,
+              qualityRating: newQuality,
+              messagingLimitTier: newLimit,
+              previousQuality: number.qualityRating,
+              changedAt: new Date().toISOString(),
+              observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
+            });
+          } else {
+            createStatusHistory.mutate({
+              phoneNumberId: number.id,
+              qualityRating: newQuality,
+              messagingLimitTier: newLimit,
+              changedAt: new Date().toISOString(),
+              observation: 'Primeira verificação',
+            });
+          }
+
+          existingHistory.add(number.id);
         }
 
         updateNumber.mutate({
@@ -141,6 +183,7 @@ const ProjectDetail = () => {
           displayPhoneNumber: detail.display_phone_number,
           lastChecked: new Date().toISOString(),
         });
+
         successCount++;
       } catch (error) {
         console.error(`Error updating number ${number.displayPhoneNumber}:`, error);
