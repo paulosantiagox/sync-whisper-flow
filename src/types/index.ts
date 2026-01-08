@@ -84,6 +84,7 @@ export interface NumberErrorState {
   errorCount: number;
   lastError: string;
   attempts: NumberErrorLog[];
+  hidden?: boolean;
 }
 
 // Campaign types

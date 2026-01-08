@@ -497,6 +497,12 @@ export const clearNumberErrors = (phoneNumberId: string) => {
   numberErrors = numberErrors.filter(e => e.phoneNumberId !== phoneNumberId);
 };
 
+export const hideNumberErrors = (phoneNumberId: string) => {
+  numberErrors = numberErrors.map(e => 
+    e.phoneNumberId === phoneNumberId ? { ...e, hidden: true } : e
+  );
+};
+
 export const getNumberErrors = (phoneNumberId: string): NumberErrorState | undefined => {
   return numberErrors.find(e => e.phoneNumberId === phoneNumberId);
 };

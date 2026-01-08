@@ -12,7 +12,7 @@ import {
   projects, whatsappNumbers, businessManagers, statusHistory as allStatusHistory,
   updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, 
   addWhatsAppNumber, addStatusHistory, updateStatusHistory, getLatestStatusHistory,
-  addNumberError, clearNumberErrors, getNumberErrors, getAllNumberErrors
+  addNumberError, clearNumberErrors, hideNumberErrors, getNumberErrors, getAllNumberErrors
 } from '@/data/mockData';
 import { WhatsAppNumber, BusinessManager, StatusHistory } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
@@ -25,8 +25,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useToast } from '@/hooks/use-toast';
 import { 
   ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, 
-  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2
+  RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, BellOff, Eraser
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -229,6 +230,18 @@ const ProjectDetail = () => {
     setDeleteNumber(null);
   };
 
+  const handleHideErrorNotification = (numberId: string) => {
+    hideNumberErrors(numberId);
+    forceUpdate({});
+    toast({ title: "Notificação ocultada", description: "A notificação de erro não será mais exibida." });
+  };
+
+  const handleClearAllErrors = (numberId: string) => {
+    clearNumberErrors(numberId);
+    forceUpdate({});
+    toast({ title: "Erros apagados", description: "Todos os registros de erro foram removidos." });
+  };
+
   const handleSaveBM = (bm: BusinessManager) => {
     if (editBM) {
       updateBusinessManager(bm.id, bm);
@@ -284,7 +297,7 @@ const ProjectDetail = () => {
                 )}
               </div>
               {/* Error Badge */}
-              {errorState && errorState.errorCount > 0 && (
+              {errorState && errorState.errorCount > 0 && !errorState.hidden && (
                 <div className="absolute -top-1 -right-1">
                   <ErrorBadge errorState={errorState} />
                 </div>
@@ -343,9 +356,37 @@ const ProjectDetail = () => {
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditNumber(number)}>
               <Edit2 className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteNumber(number)}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {errorState && errorState.errorCount > 0 && (
+                  <>
+                    {!errorState.hidden && (
+                      <DropdownMenuItem onClick={() => handleHideErrorNotification(number.id)}>
+                        <BellOff className="w-4 h-4 mr-2" />
+                        Ocultar notificação de erro
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem onClick={() => handleClearAllErrors(number.id)}>
+                      <Eraser className="w-4 h-4 mr-2" />
+                      Apagar todos os erros
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem 
+                  className="text-destructive focus:text-destructive" 
+                  onClick={() => setDeleteNumber(number)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Excluir número
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </TableCell>
       </TableRow>
