@@ -46,10 +46,10 @@ export function useUpdateUserStatus() {
   return useMutation({
     mutationFn: async ({ userId, status }: { userId: string; status: 'active' | 'pending' | 'inactive' }) => {
       const { data, error } = await supabase
-        .from('profiles')
-        .update({ status })
-        .eq('id', userId)
-        .select('id, status');
+        .rpc('admin_set_user_status', {
+          target_user_id: userId,
+          new_status: status
+        });
 
       if (error) throw error;
 
