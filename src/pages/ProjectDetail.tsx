@@ -346,7 +346,7 @@ const ProjectDetail = () => {
                       </div>
                     </TooltipTrigger>
                     <TooltipContent className="bg-popover text-popover-foreground">
-                      <p>Status alterado: {latestNotification.previousQuality} → {latestNotification.newQuality}</p>
+                      <p>Status alterado: {latestNotification.previousQuality === 'HIGH' ? 'Alta' : latestNotification.previousQuality === 'MEDIUM' ? 'Média' : 'Baixa'} → {latestNotification.newQuality === 'HIGH' ? 'Alta' : latestNotification.newQuality === 'MEDIUM' ? 'Média' : 'Baixa'}</p>
                     </TooltipContent>
                   </Tooltip>
                 )}
