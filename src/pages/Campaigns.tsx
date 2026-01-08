@@ -46,7 +46,7 @@ const Campaigns = () => {
   const [isActionTypesOpen, setIsActionTypesOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState('all');
   const [accountFilter, setAccountFilter] = useState('all');
-  const [, forceUpdate] = useState({});
+  const [updateKey, setUpdateKey] = useState(0);
 
   // Collapsible states
   const [campaignsOpen, setCampaignsOpen] = useState(true);
@@ -74,10 +74,16 @@ const Campaigns = () => {
     if (typeFilter !== 'all') result = result.filter(b => b.actionTypeId === typeFilter);
     if (accountFilter !== 'all') result = result.filter(b => b.phoneNumberId === accountFilter);
     return result.sort((a, b) => new Date(b.date + ' ' + b.time).getTime() - new Date(a.date + ' ' + a.time).getTime());
-  }, [activeCampaign?.id, typeFilter, accountFilter]);
+  }, [activeCampaign?.id, typeFilter, accountFilter, updateKey]);
 
-  const campaignActionTypes = actionTypes.filter(at => at.campaignId === activeCampaign?.id);
-  const shortcuts = campaignShortcuts.filter(s => s.campaignId === activeCampaign?.id);
+  const campaignActionTypes = useMemo(() => 
+    actionTypes.filter(at => at.campaignId === activeCampaign?.id),
+    [activeCampaign?.id, updateKey]
+  );
+  const shortcuts = useMemo(() => 
+    campaignShortcuts.filter(s => s.campaignId === activeCampaign?.id),
+    [activeCampaign?.id, updateKey]
+  );
   
   // Get all WhatsApp numbers from user's projects
   const userProjects = projects.filter(p => p.userId === user?.id);
@@ -106,7 +112,7 @@ const Campaigns = () => {
     setNewCampaignName('');
     setNewCampaignDescription('');
     setIsNewCampaignOpen(false);
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
     toast({ title: "Campanha criada!", description: `"${newCampaign.name}" foi criada com sucesso.` });
   };
 
@@ -118,7 +124,7 @@ const Campaigns = () => {
       addBroadcast(broadcast);
       toast({ title: "Disparo registrado!" });
     }
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
   };
 
   const handleSaveActionType = (at: ActionType) => {
@@ -129,7 +135,7 @@ const Campaigns = () => {
       addActionType(at);
       toast({ title: "Tipo de ação criado!" });
     }
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
   };
 
   const handleSaveShortcut = (shortcut: CampaignShortcut) => {
@@ -140,7 +146,7 @@ const Campaigns = () => {
       addCampaignShortcut(shortcut);
       toast({ title: "Atalho criado!" });
     }
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
   };
 
   const handleDelete = () => {
@@ -155,12 +161,12 @@ const Campaigns = () => {
       toast({ title: "Atalho removido!" });
     }
     setDeleteItem(null);
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
   };
 
   const handleStatusChange = (broadcastId: string, newStatus: BroadcastStatus) => {
     updateBroadcast(broadcastId, { status: newStatus });
-    forceUpdate({});
+    setUpdateKey(k => k + 1);
     toast({ title: "Status atualizado!" });
   };
 
