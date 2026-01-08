@@ -11,7 +11,8 @@ import ErrorBadge from '@/components/dashboard/ErrorBadge';
 import { 
   projects, whatsappNumbers, businessManagers, statusHistory as allStatusHistory,
   updateWhatsAppNumber, addBusinessManager, updateBusinessManager, deleteBusinessManager, 
-  addWhatsAppNumber, addStatusHistory, addNumberError, clearNumberErrors, getNumberErrors, getAllNumberErrors
+  addWhatsAppNumber, addStatusHistory, updateStatusHistory, getLatestStatusHistory,
+  addNumberError, clearNumberErrors, getNumberErrors, getAllNumberErrors
 } from '@/data/mockData';
 import { WhatsAppNumber, BusinessManager, StatusHistory } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
@@ -129,20 +130,38 @@ const ProjectDetail = () => {
         // Check if status changed
         const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
         
-        // Create history entry
-        const historyEntry: StatusHistory = {
-          id: `sh${Date.now()}_${number.id}`,
-          phoneNumberId: number.id,
-          qualityRating: newQuality,
-          messagingLimitTier: newLimit,
-          previousQuality: hasChanged ? number.qualityRating : undefined,
-          changedAt: new Date().toISOString(),
-          observation: hasChanged 
-            ? `Status alterado de ${number.qualityRating} para ${newQuality}`
-            : 'Verificação automática - sem alterações',
-        };
+        // Get latest history entry for this number
+        const latestHistory = getLatestStatusHistory(number.id);
         
-        addStatusHistory(historyEntry);
+        if (hasChanged) {
+          // Status changed - create new history entry
+          const historyEntry: StatusHistory = {
+            id: `sh${Date.now()}_${number.id}`,
+            phoneNumberId: number.id,
+            qualityRating: newQuality,
+            messagingLimitTier: newLimit,
+            previousQuality: number.qualityRating,
+            changedAt: new Date().toISOString(),
+            observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
+          };
+          addStatusHistory(historyEntry);
+        } else if (latestHistory) {
+          // No change - just update the date of the latest entry
+          updateStatusHistory(latestHistory.id, {
+            changedAt: new Date().toISOString(),
+          });
+        } else {
+          // No previous history - create first entry
+          const historyEntry: StatusHistory = {
+            id: `sh${Date.now()}_${number.id}`,
+            phoneNumberId: number.id,
+            qualityRating: newQuality,
+            messagingLimitTier: newLimit,
+            changedAt: new Date().toISOString(),
+            observation: 'Primeira verificação',
+          };
+          addStatusHistory(historyEntry);
+        }
         
         // Update number data
         updateWhatsAppNumber(number.id, {

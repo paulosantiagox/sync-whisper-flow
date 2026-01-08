@@ -401,6 +401,17 @@ export const addStatusHistory = (entry: StatusHistory) => {
   return entry;
 };
 
+export const updateStatusHistory = (id: string, data: Partial<StatusHistory>) => {
+  statusHistory = statusHistory.map(h => 
+    h.id === id ? { ...h, ...data } : h
+  );
+  return statusHistory.find(h => h.id === id);
+};
+
+export const getLatestStatusHistory = (phoneNumberId: string): StatusHistory | undefined => {
+  return statusHistory.find(h => h.phoneNumberId === phoneNumberId);
+};
+
 export const updateActionType = (id: string, data: Partial<ActionType>) => {
   actionTypes = actionTypes.map(at => 
     at.id === id ? { ...at, ...data } : at
