@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
+import { playNotificationSound, NotificationSoundType } from "@/lib/sounds";
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -10,6 +11,7 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+  sound?: NotificationSoundType | false;
 };
 
 const actionTypes = {
@@ -134,7 +136,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ sound, ...props }: Toast) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -143,6 +145,14 @@ function toast({ ...props }: Toast) {
       toast: { ...props, id },
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
+
+  // Play notification sound
+  if (sound !== false) {
+    const soundType: NotificationSoundType = 
+      sound || 
+      (props.variant === 'destructive' ? 'error' : 'info');
+    playNotificationSound(soundType);
+  }
 
   dispatch({
     type: "ADD_TOAST",
