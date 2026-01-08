@@ -221,7 +221,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Data/Hora</TableHead>
+                      <TableHead>Atualizado em</TableHead>
                       <TableHead>Status Anterior</TableHead>
                       <TableHead>Status Atual</TableHead>
                       <TableHead>Limite</TableHead>
