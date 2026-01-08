@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { WhatsAppNumber } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -16,19 +16,19 @@ interface EditNumberModalProps {
 }
 
 const EditNumberModal = ({ number, open, onOpenChange, onSave }: EditNumberModalProps) => {
-  const [customName, setCustomName] = useState(number?.customName || '');
-  const [observation, setObservation] = useState(number?.observation || '');
-  const [isVisible, setIsVisible] = useState(number?.isVisible ?? true);
+  const [customName, setCustomName] = useState('');
+  const [observation, setObservation] = useState('');
+  const [isVisible, setIsVisible] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset form when number changes
-  useState(() => {
+  useEffect(() => {
     if (number) {
       setCustomName(number.customName || '');
       setObservation(number.observation || '');
       setIsVisible(number.isVisible);
     }
-  });
+  }, [number]);
 
   const handleSave = async () => {
     if (!number) return;
