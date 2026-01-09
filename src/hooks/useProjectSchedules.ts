@@ -10,6 +10,16 @@ export interface ProjectSchedule {
   createdAt: string;
 }
 
+export interface AutoUpdateLog {
+  id: string;
+  executedAt: string;
+  brasiliaTime: string;
+  schedulesFound: number;
+  projectsChecked: number;
+  numbersUpdated: number;
+  errors: number;
+}
+
 export function useProjectSchedules(projectId?: string) {
   return useQuery({
     queryKey: ['project-schedules', projectId],
@@ -33,6 +43,39 @@ export function useProjectSchedules(projectId?: string) {
       }));
     },
     enabled: !!projectId,
+  });
+}
+
+export function useLastAutoUpdateLog() {
+  return useQuery({
+    queryKey: ['last-auto-update-log'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('auto_update_logs')
+        .select('*')
+        .order('executed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        // Tabela pode não existir ainda
+        console.log('[SCHEDULE] Tabela auto_update_logs não existe:', error.message);
+        return null;
+      }
+      
+      if (!data) return null;
+
+      return {
+        id: data.id,
+        executedAt: data.executed_at,
+        brasiliaTime: data.brasilia_time,
+        schedulesFound: data.schedules_found,
+        projectsChecked: data.projects_checked,
+        numbersUpdated: data.numbers_updated,
+        errors: data.errors,
+      } as AutoUpdateLog;
+    },
+    refetchInterval: 60000, // Atualiza a cada minuto
   });
 }
 
