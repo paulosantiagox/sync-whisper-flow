@@ -40,6 +40,34 @@ export function useProjects() {
   });
 }
 
+// Hook for admin to get all projects (for user stats)
+export function useAllProjects() {
+  const { isMaster } = useAuth();
+
+  return useQuery({
+    queryKey: ['all-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      return (data || []).map((p): Project => ({
+        id: p.id,
+        userId: p.user_id,
+        name: p.name,
+        description: p.description || undefined,
+        icon: p.icon || undefined,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      }));
+    },
+    enabled: isMaster,
+  });
+}
+
 export function useProject(id: string) {
   return useQuery({
     queryKey: ['project', id],
