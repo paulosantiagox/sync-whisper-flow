@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole } from '@/hooks/useUsers';
-import { useProjects } from '@/hooks/useProjects';
+import { useUsers, useUserStats, useUpdateUserStatus, useUpdateUserRole, useDeleteUser } from '@/hooks/useUsers';
+import { useAllProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { 
   Search, Check, X, Eye, MoreHorizontal, Users as UsersIcon, 
-  FolderKanban, Phone, Activity, Loader2, Shield, UserMinus
+  FolderKanban, Phone, Activity, Loader2, Shield, UserMinus, Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -26,21 +26,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import UserDetailModal from '@/components/modals/UserDetailModal';
+import ConfirmDialog from '@/components/modals/ConfirmDialog';
 import { User } from '@/types';
 
 const UsersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { user: currentUser } = useAuth();
 
   const { data: users = [], isLoading } = useUsers();
   const { data: stats } = useUserStats();
-  const { data: projects = [] } = useProjects();
+  const { data: projects = [] } = useAllProjects();
   const { data: numbers = [] } = useAllWhatsAppNumbers();
   const updateStatus = useUpdateUserStatus();
   const updateRole = useUpdateUserRole();
+  const deleteUser = useDeleteUser();
 
   const filteredUsers = users.filter(u => {
     const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -64,6 +67,21 @@ const UsersPage = () => {
     // If active, set to inactive. Otherwise (pending or inactive), set to active
     const newStatus = targetUser.status === 'active' ? 'inactive' : 'active';
     updateStatus.mutate({ userId: targetUser.id, status: newStatus });
+  };
+
+  const handleDeleteUser = (targetUser: User) => {
+    if (targetUser.id === currentUser?.id) {
+      toast.error('Você não pode excluir o usuário logado');
+      return;
+    }
+    setUserToDelete(targetUser);
+  };
+
+  const confirmDeleteUser = () => {
+    if (userToDelete) {
+      deleteUser.mutate(userToDelete.id);
+      setUserToDelete(null);
+    }
   };
 
   if (isLoading) {
@@ -186,6 +204,19 @@ const UsersPage = () => {
                             Rebaixar a Usuário
                           </DropdownMenuItem>
                         )}
+
+                        {user.id !== currentUser?.id && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteUser(user)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir Usuário
+                            </DropdownMenuItem>
+                          </>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -203,6 +234,18 @@ const UsersPage = () => {
         onOpenChange={(open) => !open && setSelectedUser(null)}
         projectsCount={selectedUser ? getUserStats(selectedUser.id).projects : 0}
         numbersCount={selectedUser ? getUserStats(selectedUser.id).numbers : 0}
+      />
+
+      {/* Delete User Confirmation */}
+      <ConfirmDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+        title="Excluir Usuário"
+        description={`Tem certeza que deseja excluir o usuário "${userToDelete?.name}"? Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        onConfirm={confirmDeleteUser}
+        variant="destructive"
       />
     </DashboardLayout>
   );
