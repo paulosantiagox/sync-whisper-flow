@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Project, WhatsAppNumber } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FolderKanban, Phone, ChevronRight, Calendar, Edit2, Trash2, MoreVertical } from 'lucide-react';
+import { FolderKanban, Phone, ChevronRight, Calendar, Edit2, Trash2, MoreVertical, Pin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -12,15 +12,34 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import ConfirmDialog from '@/components/modals/ConfirmDialog';
+import { SortableControls } from '@/components/ui/sortable-controls';
+import { cn } from '@/lib/utils';
 
 interface ProjectCardProps {
   project: Project;
   numbers: WhatsAppNumber[];
   onEdit?: (project: Project, data: { name: string; description?: string }) => void;
   onDelete?: (projectId: string) => void;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 }
 
-const ProjectCard = ({ project, numbers, onEdit, onDelete }: ProjectCardProps) => {
+const ProjectCard = ({ 
+  project, 
+  numbers, 
+  onEdit, 
+  onDelete,
+  isPinned = false,
+  onTogglePin,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp = true,
+  canMoveDown = true,
+}: ProjectCardProps) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editName, setEditName] = useState(project.name);
@@ -46,9 +65,17 @@ const ProjectCard = ({ project, numbers, onEdit, onDelete }: ProjectCardProps) =
 
   return (
     <>
-      <Card className="overflow-hidden transition-all duration-300 hover:shadow-elevated hover:-translate-y-1 animate-slide-up group">
+      <Card className={cn(
+        "overflow-hidden transition-all duration-300 hover:shadow-elevated hover:-translate-y-1 animate-slide-up group",
+        isPinned && "ring-2 ring-primary/50 bg-primary/5"
+      )}>
         <CardContent className="p-0">
-          {/* Header with icon */}
+          {/* Pin indicator */}
+          {isPinned && (
+            <div className="absolute top-2 right-2 z-10">
+              <Pin className="w-4 h-4 text-primary fill-primary" />
+            </div>
+          )}
           <div className="p-5 pb-4">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
@@ -134,14 +161,25 @@ const ProjectCard = ({ project, numbers, onEdit, onDelete }: ProjectCardProps) =
             )}
           </div>
 
-          {/* Action */}
-          <div className="px-5 pb-5">
-            <Link to={`/projects/${project.id}`}>
+          {/* Actions */}
+          <div className="px-5 pb-5 flex items-center gap-2">
+            <Link to={`/projects/${project.id}`} className="flex-1">
               <Button variant="outline" className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 Ver Detalhes
                 <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </Link>
+            {onTogglePin && (
+              <SortableControls
+                isPinned={isPinned}
+                onTogglePin={onTogglePin}
+                onMoveUp={onMoveUp}
+                onMoveDown={onMoveDown}
+                canMoveUp={canMoveUp}
+                canMoveDown={canMoveDown}
+                size="sm"
+              />
+            )}
           </div>
         </CardContent>
       </Card>

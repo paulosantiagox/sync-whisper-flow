@@ -150,7 +150,7 @@ const DailyHistoryItem = ({ dayGroup }: DailyHistoryItemProps) => {
       {/* Lista de Verificações Expandida */}
       {isExpanded && (
         <div className="border-t bg-muted/30">
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-border max-h-[300px] overflow-y-auto">
             {dayGroup.entries.map((entry, index) => (
               <div key={entry.id} className="px-4 py-3 flex items-center gap-4 pl-12">
                 {/* Horário */}
