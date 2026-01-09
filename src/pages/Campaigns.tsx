@@ -26,7 +26,7 @@ import { SortableControls } from '@/components/ui/sortable-controls';
 import { toast } from 'sonner';
 import { Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Edit2, Trash2, Tag, Filter, Copy, Zap, Check, Loader2, Pin, Settings } from 'lucide-react';
 import BroadcastTemplateConfigModal, { getBroadcastTemplate } from '@/components/modals/BroadcastTemplateConfigModal';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -221,7 +221,7 @@ const Campaigns = () => {
       const template = getBroadcastTemplate();
       
       let message = template
-        .replace(/{data}/g, format(new Date(broadcast.date), "dd/MM/yyyy", { locale: ptBR }))
+        .replace(/{data}/g, format(parse(broadcast.date, 'yyyy-MM-dd', new Date()), "dd/MM/yyyy", { locale: ptBR }))
         .replace(/{hora}/g, broadcast.time)
         .replace(/{conta}/g, phoneNum?.customName || phoneNum?.verifiedName || 'N/A')
         .replace(/{qualidade}/g, qualityEmoji)
@@ -456,7 +456,7 @@ const Campaigns = () => {
                             const currentStatus = getStatusOption(broadcast.status);
                             return (
                               <TableRow key={broadcast.id}>
-                                <TableCell><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /><span className="text-sm">{format(new Date(broadcast.date), "dd/MM/yyyy", { locale: ptBR })} {broadcast.time}</span></div></TableCell>
+                                <TableCell><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-muted-foreground" /><span className="text-sm">{format(parse(broadcast.date, 'yyyy-MM-dd', new Date()), "dd/MM/yyyy", { locale: ptBR })} {broadcast.time}</span></div></TableCell>
                                 <TableCell><Badge style={{ backgroundColor: actionType?.color }}>{actionType?.name || 'N/A'}</Badge></TableCell>
                                 <TableCell><div className="flex items-center gap-1.5 text-xs">{phoneNum && <span>{phoneNum.qualityRating === 'HIGH' ? '🟢' : phoneNum.qualityRating === 'MEDIUM' ? '🟡' : '🔴'}</span>}<span className="font-medium truncate max-w-[100px]">{phoneNum?.customName || phoneNum?.verifiedName || 'N/A'}</span></div></TableCell>
                                 <TableCell className="text-muted-foreground">{broadcast.listName}</TableCell>
