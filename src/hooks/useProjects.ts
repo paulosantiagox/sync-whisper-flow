@@ -86,10 +86,28 @@ export function useCreateProject() {
         .single();
 
       if (error) throw error;
+
+      // Create default schedules: 06:00, 12:00, 18:00
+      const defaultSchedules = [
+        { project_id: data.id, time: '06:00', order: 1 },
+        { project_id: data.id, time: '12:00', order: 2 },
+        { project_id: data.id, time: '18:00', order: 3 },
+      ];
+
+      const { error: scheduleError } = await supabase
+        .from('project_update_schedules')
+        .insert(defaultSchedules);
+
+      if (scheduleError) {
+        console.error('Erro ao criar horários padrão:', scheduleError);
+        // Don't throw - project was created successfully
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project-schedules'] });
       toast.success('Projeto criado com sucesso!');
     },
     onError: (error) => {
