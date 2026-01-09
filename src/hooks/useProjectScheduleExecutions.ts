@@ -14,10 +14,11 @@ export interface ScheduleExecution {
   errors: number;
 }
 
-// Hook para subscription realtime de execuções
-function useExecutionsRealtimeSubscription(projectId?: string) {
+// Busca execuções de hoje para um projeto
+export function useProjectScheduleExecutions(projectId?: string) {
   const queryClient = useQueryClient();
 
+  // Subscription realtime integrada
   useEffect(() => {
     if (!projectId) return;
 
@@ -32,7 +33,6 @@ function useExecutionsRealtimeSubscription(projectId?: string) {
           filter: `project_id=eq.${projectId}`,
         },
         () => {
-          // Invalida cache para forçar refetch imediato
           queryClient.invalidateQueries({ 
             queryKey: ['project-schedule-executions', projectId] 
           });
@@ -47,21 +47,14 @@ function useExecutionsRealtimeSubscription(projectId?: string) {
       supabase.removeChannel(channel);
     };
   }, [projectId, queryClient]);
-}
-
-// Busca execuções de hoje para um projeto
-export function useProjectScheduleExecutions(projectId?: string) {
-  // Ativa subscription realtime
-  useExecutionsRealtimeSubscription(projectId);
 
   return useQuery({
     queryKey: ['project-schedule-executions', projectId],
     queryFn: async (): Promise<ScheduleExecution[]> => {
       if (!projectId) return [];
       
-      // Busca execuções de hoje
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+      const todayStr = today.toISOString().split('T')[0];
       
       const { data, error } = await supabase
         .from('project_schedule_executions')
@@ -88,11 +81,11 @@ export function useProjectScheduleExecutions(projectId?: string) {
       }));
     },
     enabled: !!projectId,
-    staleTime: 30000, // Considera dados frescos por 30s (realtime cuida do resto)
+    staleTime: 30000,
   });
 }
 
-// Busca a última execução do projeto (para mostrar "Última verificação")
+// Busca a última execução do projeto
 export function useLastProjectExecution(projectId?: string) {
   return useQuery({
     queryKey: ['last-project-execution', projectId],
