@@ -1,15 +1,19 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useProjectSchedules, useCreateProjectSchedule, useUpdateProjectSchedule, useDeleteProjectSchedule, useLastAutoUpdateLog } from '@/hooks/useProjectSchedules';
-import { Clock, Plus, Trash2, AlertCircle, Loader2, CheckCircle2, Timer, XCircle, Play, RefreshCw } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import { Clock, Plus, Trash2, AlertCircle, CheckCircle, Loader2, Circle, Play, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { 
+  useProjectSchedules, 
+  useCreateProjectSchedule, 
+  useDeleteProjectSchedule,
+  useUpdateProjectSchedule,
+  useLastAutoUpdateLog
+} from '@/hooks/useProjectSchedules';
 
 interface UpdateScheduleModalProps {
   projectId: string;
@@ -17,94 +21,160 @@ interface UpdateScheduleModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const MAX_SCHEDULES = 7;
-const RECOMMENDED_SCHEDULES = 3;
-const EDGE_FUNCTION_URL = `https://${import.meta.env.VITE_SUPABASE_PROJECT_ID}.supabase.co/functions/v1/auto-update-status`;
+const EDGE_FUNCTION_URL = 'https://dfrfeirfllwmdkenylwk.supabase.co/functions/v1/auto-update-status';
+const MAX_SCHEDULES = 6;
+const RECOMMENDED_SCHEDULES = 4;
+
+// Formata string de tempo para HH:MM
+function formatTimeInput(value: string): string {
+  // Remove tudo que não é número
+  const digits = value.replace(/\D/g, '');
+  
+  if (digits.length === 0) return '';
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) {
+    const hours = digits.slice(0, 2);
+    const minutes = digits.slice(2);
+    return `${hours}:${minutes}`;
+  }
+  // Limita a 4 dígitos
+  const hours = digits.slice(0, 2);
+  const minutes = digits.slice(2, 4);
+  return `${hours}:${minutes}`;
+}
+
+// Valida se o horário é válido (HH:MM, 00-23:00-59)
+function isValidTime(time: string): boolean {
+  if (!/^\d{2}:\d{2}$/.test(time)) return false;
+  const [h, m] = time.split(':').map(Number);
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+}
+
+// Componente de input de horário
+function TimeInput({ 
+  value, 
+  onChange, 
+  onBlur,
+  placeholder = "HH:MM",
+  className = ""
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatTimeInput(e.target.value);
+    onChange(formatted);
+  };
+
+  const isValid = value === '' || isValidTime(value);
+
+  return (
+    <div className="relative">
+      <Input
+        type="text"
+        inputMode="numeric"
+        placeholder={placeholder}
+        value={value}
+        onChange={handleChange}
+        onBlur={onBlur}
+        maxLength={5}
+        className={`${className} ${!isValid ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+      />
+      {!isValid && value !== '' && (
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-destructive">
+          <AlertCircle className="h-4 w-4" />
+        </span>
+      )}
+    </div>
+  );
+}
 
 type ScheduleStatus = 'waiting' | 'executed' | 'missed' | 'next';
 
-function getScheduleStatus(scheduleTime: string, lastLogTime?: string): ScheduleStatus {
-  // Obter hora atual de Brasília
+// Determina o status do schedule baseado em logs reais
+function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): ScheduleStatus {
+  // Obtém hora atual de Brasília de forma segura
   const now = new Date();
-  const brasiliaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-  const currentHour = brasiliaTime.getHours();
-  const currentMinute = brasiliaTime.getMinutes();
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
+  const formatter = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+  const currentTime = formatter.format(now);
+  
+  const [currentH, currentM] = currentTime.split(':').map(Number);
+  const [schedH, schedM] = scheduleTime.split(':').map(Number);
+  
+  const currentMinutes = currentH * 60 + currentM;
+  const schedMinutes = schedH * 60 + schedM;
+  const diff = schedMinutes - currentMinutes;
 
-  const [h, m] = scheduleTime.split(':').map(Number);
-  const scheduledMinutes = h * 60 + m;
-
-  // Se está dentro da janela de execução (±2 minutos)
-  if (Math.abs(currentTotalMinutes - scheduledMinutes) <= 2) {
+  // Se está dentro da janela de ±2 minutos, é o próximo
+  if (Math.abs(diff) <= 2) {
     return 'next';
   }
-  
-  // Se o horário já passou
-  if (currentTotalMinutes > scheduledMinutes + 2) {
-    // Se temos um log recente (últimos 5 minutos), verificar se foi executado
-    if (lastLogTime) {
-      const logDate = new Date(lastLogTime);
-      const logBrasilia = new Date(logDate.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
-      const logHour = logBrasilia.getHours();
-      const logMinute = logBrasilia.getMinutes();
-      const logTotalMinutes = logHour * 60 + logMinute;
-      
-      // Se o log foi dentro de 3 minutos do horário agendado
-      if (Math.abs(logTotalMinutes - scheduledMinutes) <= 3) {
-        return 'executed';
-      }
-    }
-    // Se não temos log correspondente, assumir executado (otimista)
-    return 'executed';
+
+  // Se o horário ainda não chegou
+  if (diff > 2) {
+    return 'waiting';
   }
-  
-  // Se ainda não chegou
-  return 'waiting';
+
+  // Se já passou do horário, verifica se foi executado
+  // Checa se o último log corresponde a este horário (mesma hora aproximada)
+  if (lastLogBrasiliaTime) {
+    const [logH, logM] = lastLogBrasiliaTime.split(':').map(Number);
+    const logMinutes = logH * 60 + logM;
+    const logDiff = Math.abs(logMinutes - schedMinutes);
+    
+    // Se o log foi dentro de 5 minutos do horário agendado, consideramos executado
+    if (logDiff <= 5) {
+      return 'executed';
+    }
+  }
+
+  // Passou do horário e não há evidência de execução
+  return 'missed';
 }
 
 function ScheduleStatusIndicator({ status }: { status: ScheduleStatus }) {
   const config = {
-    waiting: {
-      icon: Timer,
-      color: 'text-muted-foreground',
-      bg: 'bg-muted',
-      label: 'Aguardando',
+    waiting: { 
+      icon: Circle, 
+      color: 'text-muted-foreground', 
+      animate: '',
+      tooltip: 'Aguardando'
     },
-    executed: {
-      icon: CheckCircle2,
-      color: 'text-green-500',
-      bg: 'bg-green-500/10',
-      label: 'Executado',
+    executed: { 
+      icon: CheckCircle, 
+      color: 'text-green-500', 
+      animate: '',
+      tooltip: 'Executado'
     },
-    missed: {
-      icon: XCircle,
-      color: 'text-destructive',
-      bg: 'bg-destructive/10',
-      label: 'Não executado',
+    missed: { 
+      icon: AlertCircle, 
+      color: 'text-orange-500', 
+      animate: '',
+      tooltip: 'Não executado'
     },
-    next: {
-      icon: Clock,
-      color: 'text-primary animate-pulse',
-      bg: 'bg-primary/10',
-      label: 'Próximo',
+    next: { 
+      icon: Loader2, 
+      color: 'text-blue-500', 
+      animate: 'animate-spin',
+      tooltip: 'Próximo'
     },
-  };
+  }[status];
 
-  const { icon: Icon, color, bg, label } = config[status];
-
+  const Icon = config.icon;
+  
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={cn('p-1.5 rounded-full', bg)}>
-            <Icon className={cn('w-4 h-4', color)} />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>{label}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <span className={`inline-flex items-center gap-1 ${config.color}`} title={config.tooltip}>
+      <Icon className={`h-3 w-3 ${config.animate}`} />
+      <span className="text-xs">{config.tooltip}</span>
+    </span>
   );
 }
 
@@ -116,6 +186,7 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
   const deleteSchedule = useDeleteProjectSchedule();
 
   const [newTime, setNewTime] = useState('12:00');
+  const [editingTimes, setEditingTimes] = useState<Record<string, string>>({});
   const [isTesting, setIsTesting] = useState(false);
   const [, setTick] = useState(0);
 
@@ -128,24 +199,55 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
     return () => clearInterval(interval);
   }, [refetchLastLog]);
 
-  const handleAddSchedule = () => {
+  // Sincroniza horários editados quando schedules mudam
+  useEffect(() => {
+    const times: Record<string, string> = {};
+    schedules.forEach(s => {
+      times[s.id] = s.time;
+    });
+    setEditingTimes(times);
+  }, [schedules]);
+
+  const handleAddSchedule = useCallback(() => {
     if (schedules.length >= MAX_SCHEDULES) return;
+    if (!isValidTime(newTime)) {
+      toast.error('Horário inválido. Use o formato HH:MM');
+      return;
+    }
     
     const nextOrder = schedules.length + 1;
     createSchedule.mutate({
       projectId,
       time: newTime,
       order: nextOrder,
+    }, {
+      onSuccess: () => {
+        toast.success('Horário adicionado!');
+      }
     });
-  };
+  }, [schedules.length, newTime, createSchedule, projectId]);
 
-  const handleUpdateTime = (id: string, time: string) => {
-    updateSchedule.mutate({ id, projectId, time });
-  };
+  const handleTimeChange = useCallback((id: string, value: string) => {
+    setEditingTimes(prev => ({ ...prev, [id]: value }));
+  }, []);
 
-  const handleDeleteSchedule = (id: string) => {
+  const handleTimeBlur = useCallback((id: string) => {
+    const time = editingTimes[id];
+    if (time && isValidTime(time)) {
+      const currentSchedule = schedules.find(s => s.id === id);
+      if (currentSchedule && currentSchedule.time !== time) {
+        updateSchedule.mutate({ id, projectId, time }, {
+          onSuccess: () => {
+            toast.success('Horário atualizado!');
+          }
+        });
+      }
+    }
+  }, [editingTimes, schedules, updateSchedule, projectId]);
+
+  const handleDeleteSchedule = useCallback((id: string) => {
     deleteSchedule.mutate({ id, projectId });
-  };
+  }, [deleteSchedule, projectId]);
 
   const handleTestNow = async () => {
     setIsTesting(true);
@@ -183,6 +285,8 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
     const [bh, bm] = b.time.split(':').map(Number);
     return (ah * 60 + am) - (bh * 60 + bm);
   });
+
+  const isNewTimeValid = isValidTime(newTime);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,7 +337,7 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
           ) : (
             <div className="space-y-3">
               {sortedSchedules.map((schedule, index) => {
-                const status = getScheduleStatus(schedule.time, lastLog?.executedAt);
+                const status = getScheduleStatus(schedule.time, lastLog?.brasiliaTime);
                 
                 return (
                   <div key={schedule.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
@@ -241,10 +345,10 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
                     <span className="text-sm font-medium text-muted-foreground w-20">
                       Horário {index + 1}
                     </span>
-                    <Input
-                      type="time"
-                      value={schedule.time}
-                      onChange={(e) => handleUpdateTime(schedule.id, e.target.value)}
+                    <TimeInput
+                      value={editingTimes[schedule.id] || schedule.time}
+                      onChange={(value) => handleTimeChange(schedule.id, value)}
+                      onBlur={() => handleTimeBlur(schedule.id)}
                       className="flex-1"
                     />
                     <Button
@@ -271,15 +375,15 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
 
           {schedules.length < MAX_SCHEDULES && (
             <div className="flex items-center gap-3 pt-4 border-t">
-              <Input
-                type="time"
+              <TimeInput
                 value={newTime}
-                onChange={(e) => setNewTime(e.target.value)}
+                onChange={setNewTime}
+                placeholder="HH:MM"
                 className="flex-1"
               />
               <Button
                 onClick={handleAddSchedule}
-                disabled={createSchedule.isPending}
+                disabled={createSchedule.isPending || !isNewTimeValid}
                 className="gap-2"
               >
                 {createSchedule.isPending ? (
@@ -319,8 +423,12 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
                 <span className="text-muted-foreground">Executado</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                 <span className="text-muted-foreground">Próximo</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-orange-500" />
+                <span className="text-muted-foreground">Não executado</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-muted-foreground" />

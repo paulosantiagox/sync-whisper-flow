@@ -117,32 +117,48 @@ export function useUpdateWhatsAppNumber() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, projectId, ...updates }: Partial<WhatsAppNumber> & { id: string; projectId: string }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<{
+      displayPhoneNumber: string;
+      qualityRating: string;
+      messagingLimitTier: string;
+      verifiedName: string;
+      wabaId: string;
+      isVisible: boolean;
+      customName: string;
+      observation: string;
+      lastChecked: string; // Só atualiza se passado explicitamente
+    }> }) => {
+      // Monta o objeto de atualização SEM last_checked automático
+      // last_checked só será incluído se updates.lastChecked for explicitamente passado
+      const updateData: Record<string, unknown> = {};
+      
+      if (updates.displayPhoneNumber !== undefined) updateData.display_phone_number = updates.displayPhoneNumber;
+      if (updates.qualityRating !== undefined) updateData.quality_rating = updates.qualityRating;
+      if (updates.messagingLimitTier !== undefined) updateData.messaging_limit_tier = updates.messagingLimitTier;
+      if (updates.verifiedName !== undefined) updateData.verified_name = updates.verifiedName;
+      if (updates.wabaId !== undefined) updateData.waba_id = updates.wabaId;
+      if (updates.isVisible !== undefined) updateData.is_visible = updates.isVisible;
+      if (updates.customName !== undefined) updateData.custom_name = updates.customName;
+      if (updates.observation !== undefined) updateData.observation = updates.observation;
+      
+      // IMPORTANTE: Só atualiza last_checked se foi passado explicitamente
+      if (updates.lastChecked !== undefined) {
+        updateData.last_checked = updates.lastChecked;
+      }
+
       const { error } = await supabase
         .from('whatsapp_numbers')
-        .update({
-          business_manager_id: updates.businessManagerId,
-          custom_name: updates.customName,
-          quality_rating: updates.qualityRating,
-          messaging_limit_tier: updates.messagingLimitTier,
-          photo: updates.photo,
-          is_visible: updates.isVisible,
-          observation: updates.observation,
-          verified_name: updates.verifiedName,
-          display_phone_number: updates.displayPhoneNumber,
-          last_checked: updates.lastChecked || new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', id);
 
       if (error) throw error;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-numbers', variables.projectId] });
-      queryClient.invalidateQueries({ queryKey: ['whatsapp-numbers-all'] });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsapp-numbers'] });
     },
     onError: (error) => {
+      console.error('[WHATSAPP] Erro ao atualizar número:', error);
       toast.error('Erro ao atualizar número');
-      console.error(error);
     },
   });
 }

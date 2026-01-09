@@ -180,12 +180,13 @@ const ProjectDetail = () => {
 
         updateNumber.mutate({
           id: number.id,
-          projectId: number.projectId,
-          qualityRating: newQuality,
-          messagingLimitTier: newLimit,
-          verifiedName: detail.verified_name,
-          displayPhoneNumber: detail.display_phone_number,
-          lastChecked: new Date().toISOString(),
+          updates: {
+            qualityRating: newQuality,
+            messagingLimitTier: newLimit,
+            verifiedName: detail.verified_name,
+            displayPhoneNumber: detail.display_phone_number,
+            lastChecked: new Date().toISOString(),
+          }
         });
 
         successCount++;
@@ -206,12 +207,26 @@ const ProjectDetail = () => {
   }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification]);
 
   const handleSaveNumber = (numberId: string, data: Partial<WhatsAppNumber>) => {
-    updateNumber.mutate({ id: numberId, projectId: id || '', ...data });
+    // Não passa lastChecked aqui - edição manual não altera "última verificação"
+    updateNumber.mutate({ 
+      id: numberId, 
+      updates: {
+        displayPhoneNumber: data.displayPhoneNumber,
+        qualityRating: data.qualityRating,
+        messagingLimitTier: data.messagingLimitTier,
+        verifiedName: data.verifiedName,
+        wabaId: data.wabaId,
+        isVisible: data.isVisible,
+        customName: data.customName,
+        observation: data.observation,
+      }
+    });
     toast.success('Número atualizado!');
   };
 
   const handleToggleVisibility = (num: WhatsAppNumber, visible: boolean) => {
-    updateNumber.mutate({ id: num.id, projectId: num.projectId, isVisible: visible });
+    // Não passa lastChecked aqui - toggle de visibilidade não altera "última verificação"
+    updateNumber.mutate({ id: num.id, updates: { isVisible: visible } });
     toast.success(visible ? 'Número ativado' : 'Número desativado');
   };
 
