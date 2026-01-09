@@ -173,24 +173,23 @@ Deno.serve(async (req) => {
               continue
             }
 
-            // Registrar no histórico COM changed_at
+            // Registrar no histórico COM changed_at (sem is_automatic que não existe na tabela)
             const { error: historyError } = await supabase.from('status_history').insert({
               phone_number_id: num.id,
               quality_rating: newQuality,
               messaging_limit_tier: newLimit,
-              previous_quality: num.quality_rating,
-              is_automatic: true,
               changed_at: new Date().toISOString(),
               observation: hasChanged 
-                ? `Status alterado de ${num.quality_rating} para ${newQuality} (automático)` 
+                ? `Status alterado de ${num.quality_rating} para ${newQuality} (verificação automática)` 
                 : 'Verificação automática',
             })
 
             if (historyError) {
               console.error(`[AUTO_UPDATE] Erro ao inserir histórico:`, historyError)
+              totalErrors++
             }
 
-            // Se mudou, registrar notificação
+            // Se mudou, registrar notificação (sem is_automatic)
             if (hasChanged) {
               const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
               const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
@@ -201,7 +200,6 @@ Deno.serve(async (req) => {
                 previous_quality: num.quality_rating,
                 new_quality: newQuality,
                 direction: direction,
-                is_automatic: true,
                 changed_at: new Date().toISOString(),
               })
 
