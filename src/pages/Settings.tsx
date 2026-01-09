@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { User, Lock, Bell, LogOut, Camera } from 'lucide-react';
+import { User, Lock, Bell, LogOut, Camera, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/lib/supabase';
 
 const Settings = () => {
   const { user, logout, updateUser } = useAuth();
@@ -28,6 +29,7 @@ const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Notification states
   const [statusAlerts, setStatusAlerts] = useState(true);
@@ -89,7 +91,7 @@ const Settings = () => {
     }, 500);
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     if (!currentPassword) {
       toast({ title: "Erro", description: "Digite sua senha atual", variant: "destructive" });
       return;
@@ -103,13 +105,41 @@ const Settings = () => {
       return;
     }
 
-    // Simulate password change
-    setTimeout(() => {
+    setIsChangingPassword(true);
+
+    try {
+      // Primeiro, verificar a senha atual fazendo login
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        toast({ title: "Erro", description: "Senha atual incorreta", variant: "destructive" });
+        setIsChangingPassword(false);
+        return;
+      }
+
+      // Agora alterar a senha
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        toast({ title: "Erro", description: updateError.message, variant: "destructive" });
+        setIsChangingPassword(false);
+        return;
+      }
+
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       toast({ title: "Senha alterada!", description: "Sua senha foi atualizada com sucesso." });
-    }, 500);
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao alterar senha", variant: "destructive" });
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
@@ -228,8 +258,8 @@ const Settings = () => {
                   />
                 </div>
               </div>
-              <Button variant="outline" onClick={handleChangePassword}>
-                Alterar Senha
+              <Button variant="outline" onClick={handleChangePassword} disabled={isChangingPassword}>
+                {isChangingPassword ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Alterando...</> : 'Alterar Senha'}
               </Button>
             </CardContent>
           </Card>

@@ -402,10 +402,9 @@ const ProjectDetail = () => {
       <Card className="mb-8 overflow-hidden">
         <div className="gradient-primary p-6">
           <h2 className="text-lg font-semibold text-primary-foreground mb-4">Resumo do Projeto</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Phone className="w-4 h-4" />Total de Números</div><p className="text-3xl font-bold text-primary-foreground">{numbers.length}</p></div>
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Activity className="w-4 h-4" />Status</div><div className="flex items-center gap-2 text-primary-foreground"><span className="text-lg font-semibold">🟢 {statusCounts.high}</span><span className="text-lg font-semibold">🟡 {statusCounts.medium}</span><span className="text-lg font-semibold">🔴 {statusCounts.low}</span></div></div>
-            <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><MessageCircle className="w-4 h-4" />Limite Total</div><p className="text-3xl font-bold text-primary-foreground">{totalLimit.toLocaleString()}/dia</p></div>
             <div><div className="flex items-center gap-2 text-primary-foreground/80 text-sm mb-1"><Building2 className="w-4 h-4" />BMs Cadastradas</div><p className="text-3xl font-bold text-primary-foreground">{projectBMs.length}</p></div>
           </div>
         </div>

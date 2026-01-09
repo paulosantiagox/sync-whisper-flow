@@ -9,6 +9,7 @@ import QualitySummary from '@/components/dashboard/QualitySummary';
 import { useCampaigns, useCreateCampaign, useUpdateCampaign, useDeleteCampaign, useBroadcasts, useCreateBroadcast, useUpdateBroadcast, useDeleteBroadcast, useActionTypes, useCreateActionType, useUpdateActionType, useDeleteActionType, useShortcuts, useCreateShortcut, useUpdateShortcut, useDeleteShortcut } from '@/hooks/useCampaigns';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
+import { useSortableItems } from '@/hooks/useSortableItems';
 import { Broadcast, ActionType, BroadcastStatus, CampaignShortcut, Campaign } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,10 +22,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { SortableControls } from '@/components/ui/sortable-controls';
 import { toast } from 'sonner';
-import { Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Edit2, Trash2, Tag, Filter, Copy, Zap, Check, Loader2 } from 'lucide-react';
+import { Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Edit2, Trash2, Tag, Filter, Copy, Zap, Check, Loader2, Pin } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 const statusOptions: { value: BroadcastStatus; label: string; color: string }[] = [
   { value: 'preparing', label: 'Em preparação', color: 'bg-muted text-muted-foreground' },
@@ -65,10 +68,34 @@ const Campaigns = () => {
   const updateCampaign = useUpdateCampaign();
   const deleteCampaign = useDeleteCampaign();
 
-  const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : campaigns[0];
+  // Hooks de ordenação para campanhas
+  const { 
+    sortedItems: sortedCampaigns, 
+    isPinned: isCampaignPinned, 
+    togglePin: toggleCampaignPin, 
+    moveUp: moveCampaignUp, 
+    moveDown: moveCampaignDown 
+  } = useSortableItems<Campaign>({
+    storageKey: 'campaigns-order',
+    items: campaigns,
+  });
+
+  const activeCampaign = selectedCampaign ? campaigns.find(c => c.id === selectedCampaign) : sortedCampaigns[0];
   const { data: broadcasts = [] } = useBroadcasts(activeCampaign?.id);
   const { data: actionTypes = [] } = useActionTypes(activeCampaign?.id);
   const { data: shortcuts = [] } = useShortcuts(activeCampaign?.id);
+
+  // Hooks de ordenação para atalhos
+  const { 
+    sortedItems: sortedShortcuts, 
+    isPinned: isShortcutPinned, 
+    togglePin: toggleShortcutPin, 
+    moveUp: moveShortcutUp, 
+    moveDown: moveShortcutDown 
+  } = useSortableItems<CampaignShortcut>({
+    storageKey: `shortcuts-order-${activeCampaign?.id}`,
+    items: shortcuts,
+  });
 
   const createBroadcast = useCreateBroadcast();
   const updateBroadcastMutation = useUpdateBroadcast();
@@ -224,14 +251,31 @@ const Campaigns = () => {
               </CardHeader>
               <CollapsibleContent>
                 <CardContent className="space-y-2 pt-0">
-                  {campaigns.length > 0 ? campaigns.map((campaign) => (
-                    <div key={campaign.id} className={`p-3 rounded-lg transition-all group ${activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}>
+                  {sortedCampaigns.length > 0 ? sortedCampaigns.map((campaign, index) => (
+                    <div key={campaign.id} className={cn(
+                      "p-3 rounded-lg transition-all group",
+                      activeCampaign?.id === campaign.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                      isCampaignPinned(campaign.id) && activeCampaign?.id !== campaign.id && 'ring-1 ring-primary/30 bg-primary/5'
+                    )}>
                       <div className="flex items-center justify-between">
                         <button onClick={() => setSelectedCampaign(campaign.id)} className="flex-1 text-left">
-                          <p className="font-medium text-sm">{campaign.name}</p>
+                          <div className="flex items-center gap-2">
+                            {isCampaignPinned(campaign.id) && <Pin className="w-3 h-3 text-primary fill-primary" />}
+                            <p className="font-medium text-sm">{campaign.name}</p>
+                          </div>
                           <p className={`text-xs ${activeCampaign?.id === campaign.id ? 'opacity-80' : 'text-muted-foreground'}`}>{broadcasts.filter(b => b.campaignId === campaign.id).length} disparos</p>
                         </button>
                         <div className="flex items-center gap-1">
+                          <SortableControls
+                            isPinned={isCampaignPinned(campaign.id)}
+                            onTogglePin={() => toggleCampaignPin(campaign.id)}
+                            onMoveUp={() => moveCampaignUp(campaign.id)}
+                            onMoveDown={() => moveCampaignDown(campaign.id)}
+                            canMoveUp={index > 0}
+                            canMoveDown={index < sortedCampaigns.length - 1}
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          />
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="icon" className={`h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity ${activeCampaign?.id === campaign.id ? 'hover:bg-primary-foreground/20' : ''}`}>
@@ -273,11 +317,29 @@ const Campaigns = () => {
                 </CardHeader>
                 <CollapsibleContent>
                   <CardContent className="space-y-2 pt-0">
-                    {shortcuts.length > 0 ? shortcuts.map((shortcut) => (
-                      <div key={shortcut.id} className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group">
+                    {sortedShortcuts.length > 0 ? sortedShortcuts.map((shortcut, index) => (
+                      <div key={shortcut.id} className={cn(
+                        "p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors group",
+                        isShortcutPinned(shortcut.id) && "ring-1 ring-primary/30 bg-primary/5"
+                      )}>
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0"><p className="font-medium text-sm text-foreground">{shortcut.name}</p><p className={`text-xs text-muted-foreground mt-1 ${shortcut.isMultiline ? 'whitespace-pre-wrap' : 'truncate'}`}>{shortcut.content}</p></div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {isShortcutPinned(shortcut.id) && <Pin className="w-3 h-3 text-primary fill-primary" />}
+                              <p className="font-medium text-sm text-foreground">{shortcut.name}</p>
+                            </div>
+                            <p className={`text-xs text-muted-foreground mt-1 ${shortcut.isMultiline ? 'whitespace-pre-wrap' : 'truncate'}`}>{shortcut.content}</p>
+                          </div>
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <SortableControls
+                              isPinned={isShortcutPinned(shortcut.id)}
+                              onTogglePin={() => toggleShortcutPin(shortcut.id)}
+                              onMoveUp={() => moveShortcutUp(shortcut.id)}
+                              onMoveDown={() => moveShortcutDown(shortcut.id)}
+                              canMoveUp={index > 0}
+                              canMoveDown={index < sortedShortcuts.length - 1}
+                              size="sm"
+                            />
                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyContent(shortcut)}>{copiedId === shortcut.id ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}</Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Edit2 className="w-3.5 h-3.5" /></Button></DropdownMenuTrigger>

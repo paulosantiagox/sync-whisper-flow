@@ -4,6 +4,8 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import ProjectCard from '@/components/dashboard/ProjectCard';
 import { useProjects, useCreateProject, useUpdateProject, useDeleteProject } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
+import { useSortableItems } from '@/hooks/useSortableItems';
+import { Project } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -24,6 +26,12 @@ const Projects = () => {
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const deleteProject = useDeleteProject();
+
+  // Hook de ordenação e fixação
+  const { sortedItems, isPinned, togglePin, moveUp, moveDown } = useSortableItems<Project>({
+    storageKey: 'projects-order',
+    items: projects,
+  });
 
   const handleEditProject = (project: any, data: { name: string; description?: string }) => {
     updateProject.mutate({ id: project.id, ...data });
@@ -48,7 +56,8 @@ const Projects = () => {
     navigate(`/projects/${result.id}`);
   };
 
-  const filteredProjects = projects.filter(p =>
+  // Filtra mantendo a ordem
+  const filteredProjects = sortedItems.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -109,6 +118,12 @@ const Projects = () => {
                 numbers={allNumbers.filter(n => n.projectId === project.id)} 
                 onEdit={handleEditProject}
                 onDelete={handleDeleteProject}
+                isPinned={isPinned(project.id)}
+                onTogglePin={() => togglePin(project.id)}
+                onMoveUp={() => moveUp(project.id)}
+                onMoveDown={() => moveDown(project.id)}
+                canMoveUp={index > 0}
+                canMoveDown={index < filteredProjects.length - 1}
               />
             </div>
           ))}
