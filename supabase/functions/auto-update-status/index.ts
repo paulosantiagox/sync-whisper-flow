@@ -173,30 +173,41 @@ Deno.serve(async (req) => {
               continue
             }
 
-            // Registrar no histórico
-            await supabase.from('status_history').insert({
+            // Registrar no histórico COM changed_at
+            const { error: historyError } = await supabase.from('status_history').insert({
               phone_number_id: num.id,
               quality_rating: newQuality,
               messaging_limit_tier: newLimit,
+              previous_quality: num.quality_rating,
               is_automatic: true,
+              changed_at: new Date().toISOString(),
               observation: hasChanged 
                 ? `Status alterado de ${num.quality_rating} para ${newQuality} (automático)` 
                 : 'Verificação automática',
             })
+
+            if (historyError) {
+              console.error(`[AUTO_UPDATE] Erro ao inserir histórico:`, historyError)
+            }
 
             // Se mudou, registrar notificação
             if (hasChanged) {
               const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
               const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
 
-              await supabase.from('status_change_notifications').insert({
+              const { error: notifError } = await supabase.from('status_change_notifications').insert({
                 phone_number_id: num.id,
                 project_id: projectId,
                 previous_quality: num.quality_rating,
                 new_quality: newQuality,
                 direction: direction,
                 is_automatic: true,
+                changed_at: new Date().toISOString(),
               })
+
+              if (notifError) {
+                console.error(`[AUTO_UPDATE] Erro ao inserir notificação:`, notifError)
+              }
             }
 
             totalUpdated++
