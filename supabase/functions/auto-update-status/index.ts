@@ -156,8 +156,8 @@ Deno.serve(async (req) => {
             console.error(`[AUTO_UPDATE] Erro ao buscar histórico de ${number.id}:`, historyError)
           }
 
-          if (hasChanged) {
-            // Mudança de status - sempre cria novo registro e notificação
+        if (hasChanged) {
+            // Mudança de status - cria registro com status anterior e notificação
             const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
             const direction = qualityValue[newQuality] > qualityValue[number.quality_rating] ? 'up' : 'down'
 
@@ -184,34 +184,9 @@ Deno.serve(async (req) => {
               })
 
             console.log(`[AUTO_UPDATE] Histórico de mudança criado para ${number.id}`)
-          } else if (lastHistory) {
-            const lastDate = new Date(lastHistory.changed_at)
-            const lastDateStart = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())
-
-            if (lastDateStart.getTime() === todayStart.getTime()) {
-              // Mesmo dia - atualiza timestamp
-              await supabase
-                .from('status_history')
-                .update({ changed_at: new Date().toISOString() })
-                .eq('id', lastHistory.id)
-              
-              console.log(`[AUTO_UPDATE] Timestamp atualizado para ${number.id} (mesmo dia)`)
-            } else {
-              // Novo dia - cria registro
-              await supabase
-                .from('status_history')
-                .insert({
-                  phone_number_id: number.id,
-                  quality_rating: newQuality,
-                  messaging_limit_tier: newLimit,
-                  changed_at: new Date().toISOString(),
-                  observation: 'Verificação diária automática',
-                })
-              
-              console.log(`[AUTO_UPDATE] Novo registro diário criado para ${number.id}`)
-            }
           } else {
-            // Primeira verificação
+            // Sem mudança - SEMPRE cria novo registro para cada verificação
+            // Isso permite ver todas as verificações do dia quando expandir
             await supabase
               .from('status_history')
               .insert({
@@ -219,10 +194,10 @@ Deno.serve(async (req) => {
                 quality_rating: newQuality,
                 messaging_limit_tier: newLimit,
                 changed_at: new Date().toISOString(),
-                observation: 'Primeira verificação automática',
+                observation: 'Verificação automática',
               })
             
-            console.log(`[AUTO_UPDATE] Primeiro registro criado para ${number.id}`)
+            console.log(`[AUTO_UPDATE] Registro de verificação criado para ${number.id}`)
           }
 
           totalUpdated++

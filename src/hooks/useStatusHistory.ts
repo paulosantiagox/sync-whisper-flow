@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { StatusHistory, StatusChangeNotification, QualityRating } from '@/types';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { DailyHistoryGroup } from '@/components/history/DailyHistoryItem';
 
 export function useStatusHistory(phoneNumberId?: string) {
   return useQuery({
@@ -32,6 +35,62 @@ export function useStatusHistory(phoneNumberId?: string) {
     },
     enabled: !!phoneNumberId,
   });
+}
+
+// Hook que agrupa o histórico por dia para visualização expandível
+export function useGroupedStatusHistory(phoneNumberId?: string) {
+  const { data: allHistory = [], isLoading, error } = useStatusHistory(phoneNumberId);
+
+  const groupedHistory = useMemo((): DailyHistoryGroup[] => {
+    if (!allHistory.length) return [];
+
+    // Agrupa por data
+    const groupsByDate = new Map<string, StatusHistory[]>();
+    
+    allHistory.forEach(entry => {
+      const date = format(new Date(entry.changedAt), 'yyyy-MM-dd');
+      const existing = groupsByDate.get(date) || [];
+      existing.push(entry);
+      groupsByDate.set(date, existing);
+    });
+
+    // Converte para array de DailyHistoryGroup
+    const dates = Array.from(groupsByDate.keys()).sort((a, b) => b.localeCompare(a)); // Mais recente primeiro
+    
+    const groups: DailyHistoryGroup[] = dates.map((date, index) => {
+      const entries = groupsByDate.get(date)!.sort(
+        (a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime()
+      );
+      
+      const finalStatus = entries[0].qualityRating; // Mais recente
+      const initialStatus = entries[entries.length - 1].qualityRating; // Mais antigo do dia
+      
+      // Status do dia anterior (próximo na lista já ordenada por data decrescente)
+      const previousDayDate = dates[index + 1];
+      const previousDayEntries = previousDayDate ? groupsByDate.get(previousDayDate) : undefined;
+      const previousDayStatus = previousDayEntries 
+        ? previousDayEntries.sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime())[0].qualityRating
+        : undefined;
+      
+      // Verifica se houve mudança de status dentro do dia
+      const hasStatusChange = entries.some(e => e.previousQuality && e.previousQuality !== e.qualityRating);
+      
+      return {
+        date,
+        displayDate: format(new Date(date + 'T12:00:00'), 'dd/MM/yyyy'),
+        finalStatus,
+        initialStatus,
+        hasStatusChange,
+        previousDayStatus,
+        verificationCount: entries.length,
+        entries,
+      };
+    });
+
+    return groups;
+  }, [allHistory]);
+
+  return { data: groupedHistory, allHistory, isLoading, error };
 }
 
 export function useCreateStatusHistory() {
