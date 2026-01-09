@@ -1,1 +1,4 @@
 project_id = "uvtjrgfouqmwopekbuxd"
+
+[functions.auto-update-status]
+verify_jwt = false

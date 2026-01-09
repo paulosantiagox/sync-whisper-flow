@@ -11,7 +11,7 @@ import QualityBadge from '@/components/dashboard/QualityBadge';
 import { useProject } from '@/hooks/useProjects';
 import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, useDeleteWhatsAppNumber } from '@/hooks/useWhatsAppNumbers';
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
-import { useCreateStatusHistory, useUpdateLastStatusHistory } from '@/hooks/useStatusHistory';
+import { useCreateStatusHistory, useUpdateLastStatusHistory, useUpdateOrCreateDailyHistory } from '@/hooks/useStatusHistory';
 import { useCreateStatusChangeNotification, useStatusChangeNotifications, useClearNumberNotifications } from '@/hooks/useStatusHistory';
 import { WhatsAppNumber, BusinessManager, StatusChangeNotification } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
@@ -62,6 +62,7 @@ const ProjectDetail = () => {
   const deleteBMMutation = useDeleteBusinessManager();
   const createStatusHistory = useCreateStatusHistory();
   const updateLastHistory = useUpdateLastStatusHistory();
+  const updateOrCreateDailyHistory = useUpdateOrCreateDailyHistory();
   const createNotification = useCreateStatusChangeNotification();
   const clearNotifications = useClearNumberNotifications();
 
@@ -177,10 +178,11 @@ const ProjectDetail = () => {
 
           existingHistory.add(number.id);
         } else {
-          // Não houve mudança e já existe histórico - apenas atualiza o timestamp do último registro
-          updateLastHistory.mutate({
+          // Não houve mudança e já existe histórico - verifica se é mesmo dia ou novo dia
+          updateOrCreateDailyHistory.mutate({
             phoneNumberId: number.id,
-            newTimestamp: new Date().toISOString(),
+            qualityRating: newQuality,
+            messagingLimitTier: newLimit,
           });
         }
 
@@ -207,7 +209,7 @@ const ProjectDetail = () => {
     } else {
       toast.success(`${successCount} números verificados com sucesso.`);
     }
-  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification, updateLastHistory]);
+  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification, updateOrCreateDailyHistory]);
 
   const handleSaveNumber = (numberId: string, data: Partial<WhatsAppNumber>) => {
     updateNumber.mutate({ id: numberId, projectId: id || '', ...data });

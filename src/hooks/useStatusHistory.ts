@@ -106,6 +106,77 @@ export function useUpdateLastStatusHistory() {
   });
 }
 
+// Atualiza ou cria registro de histórico diário (1 registro por dia)
+export function useUpdateOrCreateDailyHistory() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ 
+      phoneNumberId, 
+      qualityRating, 
+      messagingLimitTier 
+    }: { 
+      phoneNumberId: string; 
+      qualityRating: string;
+      messagingLimitTier: string;
+    }) => {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      
+      // Busca o último registro do número
+      const { data: lastRecord, error: selectError } = await supabase
+        .from('status_history')
+        .select('*')
+        .eq('phone_number_id', phoneNumberId)
+        .order('changed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+
+      // Verifica se o último registro é de hoje
+      if (lastRecord) {
+        const lastDate = new Date(lastRecord.changed_at);
+        const lastDateStart = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+        
+        if (lastDateStart.getTime() === todayStart.getTime()) {
+          // Mesmo dia - apenas atualiza o timestamp
+          const { error: updateError } = await supabase
+            .from('status_history')
+            .update({ changed_at: now.toISOString() })
+            .eq('id', lastRecord.id);
+
+          if (updateError) throw updateError;
+          return { action: 'updated' as const, id: lastRecord.id };
+        }
+      }
+
+      // Dia diferente ou sem registros - cria novo registro
+      const { data, error } = await supabase
+        .from('status_history')
+        .insert({
+          phone_number_id: phoneNumberId,
+          quality_rating: qualityRating,
+          messaging_limit_tier: messagingLimitTier,
+          changed_at: now.toISOString(),
+          observation: 'Verificação diária',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return { action: 'created' as const, id: data.id };
+    },
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['status-history', variables.phoneNumberId] });
+      console.log(`[STATUS_HISTORY] ${result.action === 'updated' ? 'Timestamp atualizado (mesmo dia)' : 'Novo registro diário criado'}`);
+    },
+    onError: (error) => {
+      console.error('[STATUS_HISTORY] Erro ao atualizar/criar histórico diário:', error);
+    },
+  });
+}
+
 // ===================== STATUS CHANGE NOTIFICATIONS =====================
 
 export function useStatusChangeNotifications(phoneNumberId?: string) {
