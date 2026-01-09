@@ -17,10 +17,10 @@ Deno.serve(async (req) => {
     // Usa a service key do Supabase pessoal
     const personalServiceKey = Deno.env.get('PERSONAL_SUPABASE_SERVICE_KEY') ?? ''
     
+    console.log('[AUTO_UPDATE] ========================================')
     console.log('[AUTO_UPDATE] Iniciando verificação -', new Date().toISOString())
     console.log('[AUTO_UPDATE] Service Key presente:', !!personalServiceKey)
     console.log('[AUTO_UPDATE] Service Key length:', personalServiceKey?.length || 0)
-    console.log('[AUTO_UPDATE] Primeiros 30 chars:', personalServiceKey?.substring(0, 30) + '...')
     
     if (!personalServiceKey) {
       console.error('[AUTO_UPDATE] PERSONAL_SUPABASE_SERVICE_KEY não configurada!')
@@ -46,35 +46,43 @@ Deno.serve(async (req) => {
     const [currentHour, currentMinute] = brasiliaTime.split(':').map(Number)
     const currentTotalMinutes = currentHour * 60 + currentMinute
 
-    console.log(`[AUTO_UPDATE] Hora de Brasília: ${brasiliaTime}`)
+    console.log(`[AUTO_UPDATE] Hora de Brasília: ${brasiliaTime} (${currentTotalMinutes} minutos)`)
 
-    // Busca todos os schedules
+    // Busca todos os schedules - SEM FILTRO para debug
+    console.log('[AUTO_UPDATE] Buscando schedules...')
     const { data: schedules, error: scheduleError } = await supabase
       .from('project_update_schedules')
       .select('*')
 
+    console.log('[AUTO_UPDATE] Query executada')
+    console.log('[AUTO_UPDATE] Erro:', scheduleError ? JSON.stringify(scheduleError) : 'null')
+    console.log('[AUTO_UPDATE] Schedules raw:', JSON.stringify(schedules))
+    console.log(`[AUTO_UPDATE] Total schedules: ${schedules?.length || 0}`)
+
     if (scheduleError) {
       console.error('[AUTO_UPDATE] Erro ao buscar schedules:', scheduleError)
       return new Response(
-        JSON.stringify({ success: false, error: scheduleError.message }),
+        JSON.stringify({ 
+          success: false, 
+          error: scheduleError.message,
+          debug: { scheduleError }
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
-
-    console.log(`[AUTO_UPDATE] Schedules encontrados: ${schedules?.length || 0}`)
-    console.log('[AUTO_UPDATE] Dados brutos:', JSON.stringify(schedules))
 
     // Filtra schedules que estão dentro da janela de 2 minutos
     const matchingSchedules = (schedules || []).filter(s => {
       const [h, m] = s.time.split(':').map(Number)
       const scheduledMinutes = h * 60 + m
       const diff = Math.abs(scheduledMinutes - currentTotalMinutes)
+      console.log(`[AUTO_UPDATE] Schedule ${s.time}: ${scheduledMinutes} min, diff: ${diff}`)
       return diff <= 2
     })
 
     const projectIds = [...new Set(matchingSchedules.map(s => s.project_id))]
     
-    console.log(`[AUTO_UPDATE] Schedules que correspondem à hora atual: ${matchingSchedules.length}`)
+    console.log(`[AUTO_UPDATE] Schedules correspondentes: ${matchingSchedules.length}`)
     console.log(`[AUTO_UPDATE] Projetos para atualizar: ${projectIds.length}`)
 
     let totalUpdated = 0
@@ -91,7 +99,7 @@ Deno.serve(async (req) => {
         .eq('project_id', projectId)
 
       if (bmsError) {
-        console.error(`[AUTO_UPDATE] Erro ao buscar BMs do projeto ${projectId}:`, bmsError)
+        console.error(`[AUTO_UPDATE] Erro ao buscar BMs:`, bmsError)
         totalErrors++
         continue
       }
@@ -107,12 +115,12 @@ Deno.serve(async (req) => {
           .eq('is_active', true)
 
         if (numbersError) {
-          console.error(`[AUTO_UPDATE] Erro ao buscar números do BM ${bm.id}:`, numbersError)
+          console.error(`[AUTO_UPDATE] Erro ao buscar números:`, numbersError)
           totalErrors++
           continue
         }
 
-        console.log(`[AUTO_UPDATE] Números encontrados no BM ${bm.id}: ${numbers?.length || 0}`)
+        console.log(`[AUTO_UPDATE] Números no BM ${bm.id}: ${numbers?.length || 0}`)
 
         // Atualizar cada número
         for (const num of numbers || []) {
@@ -123,20 +131,16 @@ Deno.serve(async (req) => {
             const metaData = await metaResponse.json()
 
             if (metaData.error) {
-              console.error(`[AUTO_UPDATE] Erro Meta para ${num.phone_number_id}:`, metaData.error.message)
+              console.error(`[AUTO_UPDATE] Erro Meta:`, metaData.error.message)
               totalErrors++
               continue
             }
 
             const newQuality = mapQuality(metaData.quality_rating)
             const newLimit = mapLimit(metaData.messaging_limit_tier)
+            const hasChanged = num.quality_rating !== newQuality || num.messaging_limit !== newLimit
 
-            // Verificar se mudou
-            const qualityChanged = num.quality_rating !== newQuality
-            const limitChanged = num.messaging_limit !== newLimit
-            const hasChanged = qualityChanged || limitChanged
-
-            console.log(`[AUTO_UPDATE] Número ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}, mudou: ${hasChanged}`)
+            console.log(`[AUTO_UPDATE] ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
 
             // Atualizar número
             const { error: updateError } = await supabase
@@ -151,7 +155,7 @@ Deno.serve(async (req) => {
               .eq('id', num.id)
 
             if (updateError) {
-              console.error(`[AUTO_UPDATE] Erro ao atualizar ${num.id}:`, updateError)
+              console.error(`[AUTO_UPDATE] Erro update:`, updateError)
               totalErrors++
               continue
             }
@@ -180,12 +184,11 @@ Deno.serve(async (req) => {
                 direction: direction,
                 is_automatic: true,
               })
-              console.log(`[AUTO_UPDATE] Mudança detectada em ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
             }
 
             totalUpdated++
           } catch (err) {
-            console.error(`[AUTO_UPDATE] Erro inesperado para ${num.id}:`, err)
+            console.error(`[AUTO_UPDATE] Erro:`, err)
             totalErrors++
           }
         }
@@ -202,17 +205,18 @@ Deno.serve(async (req) => {
         numbers_updated: totalUpdated,
         errors: totalErrors,
       })
-      console.log('[AUTO_UPDATE] Log de execução registrado')
     } catch (logError) {
-      console.log('[AUTO_UPDATE] Tabela auto_update_logs não existe ainda (ok)')
+      console.log('[AUTO_UPDATE] Tabela auto_update_logs não existe')
     }
 
     console.log(`[AUTO_UPDATE] Finalizado - ${totalUpdated} atualizados, ${totalErrors} erros`)
+    console.log('[AUTO_UPDATE] ========================================')
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         brasiliaTime,
+        totalSchedules: schedules?.length || 0,
         schedulesFound: matchingSchedules.length,
         projectsChecked: projectIds.length,
         numbersUpdated: totalUpdated,
