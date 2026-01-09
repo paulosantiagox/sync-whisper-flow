@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
@@ -13,8 +14,46 @@ export interface ScheduleExecution {
   errors: number;
 }
 
+// Hook para subscription realtime de execuções
+function useExecutionsRealtimeSubscription(projectId?: string) {
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!projectId) return;
+
+    const channel = supabase
+      .channel(`executions-${projectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'project_schedule_executions',
+          filter: `project_id=eq.${projectId}`,
+        },
+        () => {
+          // Invalida cache para forçar refetch imediato
+          queryClient.invalidateQueries({ 
+            queryKey: ['project-schedule-executions', projectId] 
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ['last-project-execution', projectId] 
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, queryClient]);
+}
+
 // Busca execuções de hoje para um projeto
 export function useProjectScheduleExecutions(projectId?: string) {
+  // Ativa subscription realtime
+  useExecutionsRealtimeSubscription(projectId);
+
   return useQuery({
     queryKey: ['project-schedule-executions', projectId],
     queryFn: async (): Promise<ScheduleExecution[]> => {
@@ -49,7 +88,7 @@ export function useProjectScheduleExecutions(projectId?: string) {
       }));
     },
     enabled: !!projectId,
-    refetchInterval: 60000, // Atualiza a cada minuto
+    staleTime: 30000, // Considera dados frescos por 30s (realtime cuida do resto)
   });
 }
 
@@ -88,6 +127,6 @@ export function useLastProjectExecution(projectId?: string) {
       };
     },
     enabled: !!projectId,
-    refetchInterval: 60000,
+    staleTime: 30000,
   });
 }
