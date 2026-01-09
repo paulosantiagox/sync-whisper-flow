@@ -46,48 +46,7 @@ export function useProjectSchedules(projectId?: string) {
   });
 }
 
-export function useLastAutoUpdateLog(projectId?: string) {
-  return useQuery({
-    queryKey: ['last-auto-update-log', projectId],
-    queryFn: async () => {
-      // Busca logs de hoje (últimas 24h)
-      const today = new Date();
-      today.setHours(today.getHours() - 24);
-      
-      let query = supabase
-        .from('auto_update_logs')
-        .select('*')
-        .gte('executed_at', today.toISOString())
-        .order('executed_at', { ascending: false })
-        .limit(1);
-
-      // Se tiver projectId, filtra por projeto (se a coluna existir)
-      // Por enquanto busca o último log geral
-
-      const { data, error } = await query.maybeSingle();
-
-      if (error) {
-        // Tabela pode não existir ainda
-        console.log('[SCHEDULE] Tabela auto_update_logs não existe:', error.message);
-        return null;
-      }
-      
-      if (!data) return null;
-
-      return {
-        id: data.id,
-        executedAt: data.executed_at,
-        brasiliaTime: data.brasilia_time,
-        schedulesFound: data.schedules_found,
-        projectsChecked: data.projects_checked,
-        numbersUpdated: data.numbers_updated,
-        errors: data.errors,
-      } as AutoUpdateLog;
-    },
-    refetchInterval: 60000, // Atualiza a cada minuto
-    enabled: true,
-  });
-}
+// Hook removido - substituído por useLastProjectExecution em useProjectScheduleExecutions.ts
 
 export function useCreateProjectSchedule() {
   const queryClient = useQueryClient();

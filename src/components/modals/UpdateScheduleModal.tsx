@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, forwardRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Clock, Plus, Trash2, AlertCircle, CheckCircle, Loader2, Circle, Play, RefreshCw } from 'lucide-react';
+import { Clock, Plus, Trash2, AlertCircle, CheckCircle, Loader2, Circle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { formatDistanceToNow } from 'date-fns';
@@ -12,8 +12,8 @@ import {
   useCreateProjectSchedule, 
   useDeleteProjectSchedule,
   useUpdateProjectSchedule,
-  useLastAutoUpdateLog
 } from '@/hooks/useProjectSchedules';
+import { useProjectScheduleExecutions, useLastProjectExecution } from '@/hooks/useProjectScheduleExecutions';
 
 interface UpdateScheduleModalProps {
   projectId: string;
@@ -21,14 +21,11 @@ interface UpdateScheduleModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Edge Function está hospedada no Lovable Cloud, mas acessa dados do Supabase pessoal
-const EDGE_FUNCTION_URL = 'https://uvtjrgfouqmwopekbuxd.supabase.co/functions/v1/auto-update-status';
 const MAX_SCHEDULES = 6;
 const RECOMMENDED_SCHEDULES = 4;
 
 // Formata string de tempo para HH:MM
 function formatTimeInput(value: string): string {
-  // Remove tudo que não é número
   const digits = value.replace(/\D/g, '');
   
   if (digits.length === 0) return '';
@@ -38,7 +35,6 @@ function formatTimeInput(value: string): string {
     const minutes = digits.slice(2);
     return `${hours}:${minutes}`;
   }
-  // Limita a 4 dígitos
   const hours = digits.slice(0, 2);
   const minutes = digits.slice(2, 4);
   return `${hours}:${minutes}`;
@@ -51,20 +47,14 @@ function isValidTime(time: string): boolean {
   return h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }
 
-// Componente de input de horário
-function TimeInput({ 
-  value, 
-  onChange, 
-  onBlur,
-  placeholder = "HH:MM",
-  className = ""
-}: { 
+// Componente de input de horário com forwardRef
+const TimeInput = forwardRef<HTMLInputElement, { 
   value: string; 
   onChange: (value: string) => void;
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
-}) {
+}>(({ value, onChange, onBlur, placeholder = "HH:MM", className = "" }, ref) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const formatted = formatTimeInput(e.target.value);
     onChange(formatted);
@@ -75,6 +65,7 @@ function TimeInput({
   return (
     <div className="relative">
       <Input
+        ref={ref}
         type="text"
         inputMode="numeric"
         placeholder={placeholder}
@@ -91,11 +82,13 @@ function TimeInput({
       )}
     </div>
   );
-}
+});
+
+TimeInput.displayName = 'TimeInput';
 
 type ScheduleStatus = 'waiting' | 'executed' | 'missed' | 'next';
 
-// Obtém hora atual de Brasília de forma segura
+// Obtém hora atual de Brasília
 function getCurrentBrasiliaTime(): { hours: number; minutes: number; formatted: string } {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('pt-BR', {
@@ -109,38 +102,34 @@ function getCurrentBrasiliaTime(): { hours: number; minutes: number; formatted: 
   return { hours, minutes, formatted };
 }
 
-// Determina o status do schedule baseado na hora atual e logs
-function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): ScheduleStatus {
+// Determina o status do schedule baseado na hora atual e execuções reais
+function getScheduleStatus(
+  scheduleTime: string, 
+  executedTimes: Set<string>
+): ScheduleStatus {
   const { hours: currentH, minutes: currentM } = getCurrentBrasiliaTime();
   const [schedH, schedM] = scheduleTime.split(':').map(Number);
   
   const currentMinutes = currentH * 60 + currentM;
   const schedMinutes = schedH * 60 + schedM;
-  const diff = schedMinutes - currentMinutes;
+  const diff = schedMinutes - currentMinutes; // positivo = futuro, negativo = passado
 
-  // Se está dentro da janela de ±2 minutos, é o próximo
-  if (Math.abs(diff) <= 2) {
+  // Verifica se foi executado hoje
+  if (executedTimes.has(scheduleTime)) {
+    return 'executed';
+  }
+
+  // Se está no futuro próximo (0 a 2 min), é o próximo
+  if (diff >= 0 && diff <= 2) {
     return 'next';
   }
 
-  // Se o horário ainda não chegou
+  // Se está no futuro (mais de 2 min), aguardando
   if (diff > 2) {
     return 'waiting';
   }
 
-  // Se já passou do horário, verifica se foi executado
-  // Checa se existe um log que corresponde a este horário
-  if (lastLogBrasiliaTime) {
-    const [logH, logM] = lastLogBrasiliaTime.split(':').map(Number);
-    const logMinutes = logH * 60 + logM;
-    
-    // Se o log foi DEPOIS do horário agendado (ou muito próximo), consideramos executado
-    if (logMinutes >= schedMinutes - 2) {
-      return 'executed';
-    }
-  }
-
-  // Passou do horário e não há evidência de execução para este horário
+  // Se já passou e não foi executado, não executado (missed)
   return 'missed';
 }
 
@@ -184,24 +173,26 @@ function ScheduleStatusIndicator({ status }: { status: ScheduleStatus }) {
 
 export default function UpdateScheduleModal({ projectId, open, onOpenChange }: UpdateScheduleModalProps) {
   const { data: schedules = [], isLoading } = useProjectSchedules(projectId);
-  const { data: lastLog, refetch: refetchLastLog } = useLastAutoUpdateLog(projectId);
+  const { data: executions = [] } = useProjectScheduleExecutions(projectId);
+  const { data: lastExecution } = useLastProjectExecution(projectId);
   const createSchedule = useCreateProjectSchedule();
   const updateSchedule = useUpdateProjectSchedule();
   const deleteSchedule = useDeleteProjectSchedule();
 
   const [newTime, setNewTime] = useState('12:00');
   const [editingTimes, setEditingTimes] = useState<Record<string, string>>({});
-  const [isTesting, setIsTesting] = useState(false);
   const [, setTick] = useState(0);
+
+  // Set de horários executados hoje
+  const executedTimes = new Set(executions.map(e => e.scheduleTime));
 
   // Atualiza os indicadores de status a cada minuto
   useEffect(() => {
     const interval = setInterval(() => {
       setTick(t => t + 1);
-      refetchLastLog();
     }, 60000);
     return () => clearInterval(interval);
-  }, [refetchLastLog]);
+  }, []);
 
   // Sincroniza horários editados quando schedules mudam
   useEffect(() => {
@@ -253,36 +244,6 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
     deleteSchedule.mutate({ id, projectId });
   }, [deleteSchedule, projectId]);
 
-  const handleTestNow = async () => {
-    setIsTesting(true);
-    try {
-      // Envia o projectId para forçar atualização apenas deste projeto
-      const response = await fetch(EDGE_FUNCTION_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId }),
-      });
-      const result = await response.json();
-      
-      console.log('[TEST] Resultado:', result);
-
-      if (result.success) {
-        toast.success(
-          `Teste executado! ${result.numbersUpdated} números verificados neste projeto.`,
-          { duration: 5000 }
-        );
-        refetchLastLog();
-      } else {
-        toast.error('Erro no teste: ' + (result.error || 'Erro desconhecido'));
-      }
-    } catch (error) {
-      console.error('[TEST] Erro:', error);
-      toast.error('Erro ao executar teste');
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
   // Ordenar schedules por horário
   const sortedSchedules = [...schedules].sort((a, b) => {
     const [ah, am] = a.time.split(':').map(Number);
@@ -308,19 +269,22 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
 
         <div className="space-y-4 mt-4">
           {/* Última execução */}
-          {lastLog && (
+          {lastExecution && (
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
               <div className="flex items-center gap-2">
                 <RefreshCw className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  Última verificação: {formatDistanceToNow(new Date(lastLog.executedAt), { 
+                  Última verificação: {formatDistanceToNow(new Date(lastExecution.executedAt), { 
                     addSuffix: true, 
                     locale: ptBR 
                   })}
+                  {lastExecution.brasiliaTime && (
+                    <span className="ml-1">({lastExecution.brasiliaTime})</span>
+                  )}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">
-                {lastLog.numbersUpdated} números
+                {lastExecution.numbersUpdated} números
               </span>
             </div>
           )}
@@ -341,7 +305,7 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
           ) : (
             <div className="space-y-3">
               {sortedSchedules.map((schedule, index) => {
-                const status = getScheduleStatus(schedule.time, lastLog?.brasiliaTime);
+                const status = getScheduleStatus(schedule.time, executedTimes);
                 
                 return (
                   <div key={schedule.id} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
@@ -399,26 +363,6 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
               </Button>
             </div>
           )}
-
-          {/* Botão de teste */}
-          <div className="pt-4 border-t">
-            <Button
-              onClick={handleTestNow}
-              disabled={isTesting}
-              variant="outline"
-              className="w-full gap-2"
-            >
-              {isTesting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-              {isTesting ? 'Executando...' : 'Testar Agora'}
-            </Button>
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Executa a verificação manualmente para testar
-            </p>
-          </div>
 
           <div className="pt-4 border-t space-y-2">
             <div className="flex items-center gap-4 justify-center text-xs">

@@ -33,18 +33,6 @@ Deno.serve(async (req) => {
       auth: { persistSession: false }
     })
 
-    // Verificar se é um teste forçado para um projeto específico
-    let forceProjectId: string | null = null
-    try {
-      const body = await req.json()
-      if (body?.projectId) {
-        forceProjectId = body.projectId
-        console.log('[AUTO_UPDATE] MODO TESTE - Projeto forçado:', forceProjectId)
-      }
-    } catch {
-      // Sem body, execução normal
-    }
-
     // Obter hora atual em Brasília (UTC-3)
     const now = new Date()
     const brasiliaFormatter = new Intl.DateTimeFormat('pt-BR', {
@@ -53,11 +41,20 @@ Deno.serve(async (req) => {
       minute: '2-digit',
       hour12: false
     })
+    const brasiliaDateFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+    
     const brasiliaTime = brasiliaFormatter.format(now)
+    const brasiliaDate = brasiliaDateFormatter.format(now) // YYYY-MM-DD
     const [currentHour, currentMinute] = brasiliaTime.split(':').map(Number)
     const currentTotalMinutes = currentHour * 60 + currentMinute
 
     console.log(`[AUTO_UPDATE] Hora de Brasília: ${brasiliaTime} (${currentTotalMinutes} minutos)`)
+    console.log(`[AUTO_UPDATE] Data de Brasília: ${brasiliaDate}`)
 
     // Busca todos os schedules
     console.log('[AUTO_UPDATE] Buscando schedules...')
@@ -75,160 +72,218 @@ Deno.serve(async (req) => {
       )
     }
 
-    let projectIds: string[]
-    let matchingSchedules: typeof schedules
+    // Filtra schedules que estão EXATAMENTE no horário ou até 1 minuto atrasados
+    // Regra: 0 <= (currentMinutes - scheduleMinutes) <= 1
+    const matchingSchedules = (schedules || []).filter(s => {
+      const [h, m] = s.time.split(':').map(Number)
+      const scheduledMinutes = h * 60 + m
+      const diff = currentTotalMinutes - scheduledMinutes
+      console.log(`[AUTO_UPDATE] Schedule ${s.time}: diff = ${diff}`)
+      // Executa se estamos no horário exato ou até 1 minuto depois
+      return diff >= 0 && diff <= 1
+    })
 
-    if (forceProjectId) {
-      // MODO TESTE: Atualiza apenas o projeto especificado, ignora horários
-      projectIds = [forceProjectId]
-      matchingSchedules = (schedules || []).filter(s => s.project_id === forceProjectId)
-      console.log(`[AUTO_UPDATE] MODO TESTE - Forçando atualização do projeto: ${forceProjectId}`)
-    } else {
-      // MODO NORMAL: Filtra schedules que estão dentro da janela de 2 minutos
-      matchingSchedules = (schedules || []).filter(s => {
-        const [h, m] = s.time.split(':').map(Number)
-        const scheduledMinutes = h * 60 + m
-        const diff = Math.abs(scheduledMinutes - currentTotalMinutes)
-        console.log(`[AUTO_UPDATE] Schedule ${s.time}: ${scheduledMinutes} min, diff: ${diff}`)
-        return diff <= 2
-      })
-      projectIds = [...new Set(matchingSchedules.map(s => s.project_id))]
-    }
-    
     console.log(`[AUTO_UPDATE] Schedules correspondentes: ${matchingSchedules?.length || 0}`)
-    console.log(`[AUTO_UPDATE] Projetos para atualizar: ${projectIds.length}`)
+
+    // Agrupa por projeto
+    const projectScheduleMap = new Map<string, string[]>()
+    for (const s of matchingSchedules) {
+      const times = projectScheduleMap.get(s.project_id) || []
+      times.push(s.time)
+      projectScheduleMap.set(s.project_id, times)
+    }
+
+    console.log(`[AUTO_UPDATE] Projetos para atualizar: ${projectScheduleMap.size}`)
 
     let totalUpdated = 0
     let totalErrors = 0
+    const executedProjects: string[] = []
 
     // Processar cada projeto
-    for (const projectId of projectIds) {
-      console.log(`[AUTO_UPDATE] Processando projeto: ${projectId}`)
+    for (const [projectId, scheduleTimes] of projectScheduleMap) {
+      // Para cada horário do projeto, tenta registrar execução (deduplicação)
+      for (const scheduleTime of scheduleTimes) {
+        console.log(`[AUTO_UPDATE] Tentando executar ${projectId} para ${scheduleTime}`)
+        
+        // DEDUPLICAÇÃO: Tenta inserir na tabela de execuções
+        // Se já existe, o insert falha e pulamos
+        const { error: execError } = await supabase
+          .from('project_schedule_executions')
+          .insert({
+            project_id: projectId,
+            schedule_time: scheduleTime,
+            execution_date: brasiliaDate,
+            brasilia_time: brasiliaTime,
+            trigger_source: 'cron',
+          })
 
-      // Busca business managers do projeto
-      const { data: bms, error: bmsError } = await supabase
-        .from('business_managers')
-        .select('id, access_token')
-        .eq('project_id', projectId)
+        if (execError) {
+          if (execError.code === '23505') {
+            // Violação de unique constraint = já executou hoje
+            console.log(`[AUTO_UPDATE] Schedule ${scheduleTime} do projeto ${projectId} já foi executado hoje, pulando`)
+            continue
+          } else if (execError.message?.includes('does not exist')) {
+            // Tabela não existe ainda, continua sem deduplicação
+            console.log(`[AUTO_UPDATE] Tabela project_schedule_executions não existe, executando sem deduplicação`)
+          } else {
+            console.error(`[AUTO_UPDATE] Erro ao registrar execução:`, execError)
+          }
+        }
 
-      if (bmsError) {
-        console.error(`[AUTO_UPDATE] Erro ao buscar BMs:`, bmsError)
-        totalErrors++
-        continue
-      }
+        // Busca business managers do projeto
+        const { data: bms, error: bmsError } = await supabase
+          .from('business_managers')
+          .select('id, access_token')
+          .eq('project_id', projectId)
 
-      console.log(`[AUTO_UPDATE] BMs encontrados: ${bms?.length || 0}`)
-
-      // Para cada BM, buscar números ativos
-      for (const bm of bms || []) {
-        const { data: numbers, error: numbersError } = await supabase
-          .from('whatsapp_numbers')
-          .select('*')
-          .eq('business_manager_id', bm.id)
-          .eq('is_visible', true)
-
-        if (numbersError) {
-          console.error(`[AUTO_UPDATE] Erro ao buscar números:`, numbersError)
+        if (bmsError) {
+          console.error(`[AUTO_UPDATE] Erro ao buscar BMs:`, bmsError)
           totalErrors++
           continue
         }
 
-        console.log(`[AUTO_UPDATE] Números no BM ${bm.id}: ${numbers?.length || 0}`)
+        console.log(`[AUTO_UPDATE] BMs encontrados: ${bms?.length || 0}`)
 
-        // Atualizar cada número
-        for (const num of numbers || []) {
-          try {
-            // Chamar API do Meta
-            const metaUrl = `https://graph.facebook.com/v21.0/${num.phone_number_id}?fields=quality_rating,messaging_limit_tier,verified_name,display_phone_number&access_token=${bm.access_token}`
-            const metaResponse = await fetch(metaUrl)
-            const metaData = await metaResponse.json()
+        let projectNumbersUpdated = 0
+        let projectErrors = 0
 
-            if (metaData.error) {
-              console.error(`[AUTO_UPDATE] Erro Meta:`, metaData.error.message)
-              totalErrors++
-              continue
-            }
+        // Para cada BM, buscar números ativos
+        for (const bm of bms || []) {
+          const { data: numbers, error: numbersError } = await supabase
+            .from('whatsapp_numbers')
+            .select('*')
+            .eq('business_manager_id', bm.id)
+            .eq('is_visible', true)
 
-            const newQuality = mapQuality(metaData.quality_rating)
-            const newLimit = mapLimit(metaData.messaging_limit_tier)
-            const hasChanged = num.quality_rating !== newQuality || num.messaging_limit_tier !== newLimit
+          if (numbersError) {
+            console.error(`[AUTO_UPDATE] Erro ao buscar números:`, numbersError)
+            totalErrors++
+            projectErrors++
+            continue
+          }
 
-            console.log(`[AUTO_UPDATE] ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
+          console.log(`[AUTO_UPDATE] Números no BM ${bm.id}: ${numbers?.length || 0}`)
 
-            // Atualizar número
-            const { error: updateError } = await supabase
-              .from('whatsapp_numbers')
-              .update({
+          // Atualizar cada número
+          for (const num of numbers || []) {
+            try {
+              // Chamar API do Meta
+              const metaUrl = `https://graph.facebook.com/v21.0/${num.phone_number_id}?fields=quality_rating,messaging_limit_tier,verified_name,display_phone_number&access_token=${bm.access_token}`
+              const metaResponse = await fetch(metaUrl)
+              const metaData = await metaResponse.json()
+
+              if (metaData.error) {
+                console.error(`[AUTO_UPDATE] Erro Meta:`, metaData.error.message)
+                totalErrors++
+                projectErrors++
+                continue
+              }
+
+              const newQuality = mapQuality(metaData.quality_rating)
+              const newLimit = mapLimit(metaData.messaging_limit_tier)
+              const hasChanged = num.quality_rating !== newQuality || num.messaging_limit_tier !== newLimit
+
+              console.log(`[AUTO_UPDATE] ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
+
+              // Atualizar número
+              const { error: updateError } = await supabase
+                .from('whatsapp_numbers')
+                .update({
+                  quality_rating: newQuality,
+                  messaging_limit_tier: newLimit,
+                  verified_name: metaData.verified_name || num.verified_name,
+                  display_phone_number: metaData.display_phone_number || num.display_phone_number,
+                  last_checked: new Date().toISOString(),
+                })
+                .eq('id', num.id)
+
+              if (updateError) {
+                console.error(`[AUTO_UPDATE] Erro update:`, updateError)
+                totalErrors++
+                projectErrors++
+                continue
+              }
+
+              // Registrar no histórico
+              const { error: historyError } = await supabase.from('status_history').insert({
+                phone_number_id: num.id,
                 quality_rating: newQuality,
                 messaging_limit_tier: newLimit,
-                verified_name: metaData.verified_name || num.verified_name,
-                display_phone_number: metaData.display_phone_number || num.display_phone_number,
-                last_checked: new Date().toISOString(),
-              })
-              .eq('id', num.id)
-
-            if (updateError) {
-              console.error(`[AUTO_UPDATE] Erro update:`, updateError)
-              totalErrors++
-              continue
-            }
-
-            // Registrar no histórico COM changed_at (sem is_automatic que não existe na tabela)
-            const { error: historyError } = await supabase.from('status_history').insert({
-              phone_number_id: num.id,
-              quality_rating: newQuality,
-              messaging_limit_tier: newLimit,
-              changed_at: new Date().toISOString(),
-              observation: hasChanged 
-                ? `Status alterado de ${num.quality_rating} para ${newQuality} (verificação automática)` 
-                : 'Verificação automática',
-            })
-
-            if (historyError) {
-              console.error(`[AUTO_UPDATE] Erro ao inserir histórico:`, historyError)
-              totalErrors++
-            }
-
-            // Se mudou, registrar notificação (sem is_automatic)
-            if (hasChanged) {
-              const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
-              const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
-
-              const { error: notifError } = await supabase.from('status_change_notifications').insert({
-                phone_number_id: num.id,
-                project_id: projectId,
-                previous_quality: num.quality_rating,
-                new_quality: newQuality,
-                direction: direction,
                 changed_at: new Date().toISOString(),
+                observation: hasChanged 
+                  ? `Status alterado de ${num.quality_rating} para ${newQuality} (verificação automática)` 
+                  : 'Verificação automática',
               })
 
-              if (notifError) {
-                console.error(`[AUTO_UPDATE] Erro ao inserir notificação:`, notifError)
+              if (historyError) {
+                console.error(`[AUTO_UPDATE] Erro ao inserir histórico:`, historyError)
+                totalErrors++
+                projectErrors++
               }
-            }
 
-            totalUpdated++
-          } catch (err) {
-            console.error(`[AUTO_UPDATE] Erro:`, err)
-            totalErrors++
+              // Se mudou, registrar notificação
+              if (hasChanged) {
+                const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
+                const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
+
+                const { error: notifError } = await supabase.from('status_change_notifications').insert({
+                  phone_number_id: num.id,
+                  project_id: projectId,
+                  previous_quality: num.quality_rating,
+                  new_quality: newQuality,
+                  direction: direction,
+                  changed_at: new Date().toISOString(),
+                })
+
+                if (notifError) {
+                  console.error(`[AUTO_UPDATE] Erro ao inserir notificação:`, notifError)
+                }
+              }
+
+              totalUpdated++
+              projectNumbersUpdated++
+            } catch (err) {
+              console.error(`[AUTO_UPDATE] Erro:`, err)
+              totalErrors++
+              projectErrors++
+            }
           }
         }
+
+        // Atualiza a execução com os contadores
+        if (!execError || execError.message?.includes('does not exist')) {
+          try {
+            await supabase
+              .from('project_schedule_executions')
+              .update({
+                numbers_checked: projectNumbersUpdated + projectErrors,
+                numbers_updated: projectNumbersUpdated,
+                errors: projectErrors,
+              })
+              .eq('project_id', projectId)
+              .eq('schedule_time', scheduleTime)
+              .eq('execution_date', brasiliaDate)
+          } catch (e) {
+            // Ignora erro se tabela não existe
+          }
+        }
+
+        executedProjects.push(projectId)
       }
     }
 
-    // Registrar execução na tabela de logs
+    // Registrar execução na tabela de logs global
     try {
       await supabase.from('auto_update_logs').insert({
         executed_at: new Date().toISOString(),
         brasilia_time: brasiliaTime,
         schedules_found: matchingSchedules.length,
-        projects_checked: projectIds.length,
+        projects_checked: executedProjects.length,
         numbers_updated: totalUpdated,
         errors: totalErrors,
       })
     } catch (logError) {
-      console.log('[AUTO_UPDATE] Tabela auto_update_logs não existe')
+      console.log('[AUTO_UPDATE] Erro ao gravar log global:', logError)
     }
 
     console.log(`[AUTO_UPDATE] Finalizado - ${totalUpdated} atualizados, ${totalErrors} erros`)
@@ -240,7 +295,7 @@ Deno.serve(async (req) => {
         brasiliaTime,
         totalSchedules: schedules?.length || 0,
         schedulesFound: matchingSchedules.length,
-        projectsChecked: projectIds.length,
+        projectsChecked: executedProjects.length,
         numbersUpdated: totalUpdated,
         errors: totalErrors
       }),
