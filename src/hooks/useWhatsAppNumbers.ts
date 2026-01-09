@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase';
 import { WhatsAppNumber, QualityRating } from '@/types';
 import { toast } from 'sonner';
 
-// Hook para subscription realtime de números WhatsApp
-function useWhatsAppNumbersRealtimeSubscription(projectId?: string) {
+export function useWhatsAppNumbers(projectId?: string) {
   const queryClient = useQueryClient();
 
+  // Subscription realtime integrada
   useEffect(() => {
     if (!projectId) return;
 
@@ -16,13 +16,12 @@ function useWhatsAppNumbersRealtimeSubscription(projectId?: string) {
       .on(
         'postgres_changes',
         {
-          event: '*', // INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'whatsapp_numbers',
           filter: `project_id=eq.${projectId}`,
         },
         () => {
-          // Invalida cache para forçar refetch imediato
           queryClient.invalidateQueries({ 
             queryKey: ['whatsapp-numbers', projectId] 
           });
@@ -34,11 +33,6 @@ function useWhatsAppNumbersRealtimeSubscription(projectId?: string) {
       supabase.removeChannel(channel);
     };
   }, [projectId, queryClient]);
-}
-
-export function useWhatsAppNumbers(projectId?: string) {
-  // Ativa subscription realtime
-  useWhatsAppNumbersRealtimeSubscription(projectId);
 
   return useQuery({
     queryKey: ['whatsapp-numbers', projectId],
@@ -75,7 +69,7 @@ export function useWhatsAppNumbers(projectId?: string) {
       }));
     },
     enabled: projectId !== undefined,
-    staleTime: 30000, // Considera dados frescos por 30s (realtime cuida do resto)
+    staleTime: 30000,
   });
 }
 
