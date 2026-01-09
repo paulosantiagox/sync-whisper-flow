@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -12,10 +11,9 @@ import {
   MessageSquare,
   ChevronRight,
   ChevronLeft,
-  PanelLeftClose,
-  PanelLeft
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { BrasiliaClockWidget } from './BrasiliaClockWidget';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -115,6 +113,9 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
         <div className="p-2 border-t border-sidebar-border">
           {!collapsed ? (
             <>
+              {/* Relógio de Brasília */}
+              <BrasiliaClockWidget collapsed={false} />
+              
               <div className="flex items-center gap-3 mb-3 px-2">
                 {user?.photo ? (
                   <img 
@@ -153,6 +154,9 @@ const Sidebar = ({ collapsed, onToggle }: SidebarProps) => {
             </>
           ) : (
             <div className="flex flex-col items-center gap-2">
+              {/* Relógio compacto */}
+              <BrasiliaClockWidget collapsed={true} />
+              
               <Tooltip>
                 <TooltipTrigger asChild>
                   {user?.photo ? (
