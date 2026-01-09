@@ -12,8 +12,10 @@ import { useProject } from '@/hooks/useProjects';
 import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, useDeleteWhatsAppNumber } from '@/hooks/useWhatsAppNumbers';
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
 import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification } from '@/hooks/useStatusHistory';
-import { WhatsAppNumber, BusinessManager, StatusChangeNotification } from '@/types';
+import { useAutoUpdateNotifications } from '@/hooks/useAutoUpdateNotifications';
+import { WhatsAppNumber, BusinessManager } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
+import { playNotificationSound } from '@/lib/sounds';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +64,9 @@ const ProjectDetail = () => {
   const createStatusHistory = useCreateStatusHistory();
   const createNotification = useCreateStatusChangeNotification();
   const clearNotifications = useClearNumberNotifications();
+
+  // Hook para receber notificações de atualizações automáticas em tempo real
+  useAutoUpdateNotifications(id);
 
   const { activeNumbers, inactiveNumbers } = useMemo(() => {
     const filtered = numbers.filter(n => {
@@ -193,8 +198,10 @@ const ProjectDetail = () => {
     setIsUpdating(false);
     if (errorCount > 0) {
       toast.error(`${successCount} números atualizados, ${errorCount} com erro.`);
+      playNotificationSound('error');
     } else {
-      toast.success(`${successCount} números verificados com sucesso.`);
+      toast.success(`✅ ${successCount} números verificados com sucesso!`);
+      playNotificationSound('success');
     }
   }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification]);
 

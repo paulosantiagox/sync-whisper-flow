@@ -5,24 +5,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Credenciais do Supabase PESSOAL do usuário (onde estão os dados)
+const PERSONAL_SUPABASE_URL = 'https://dfrfeirfllwmdkenylwk.supabase.co'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    // Usa a service key do Supabase pessoal
+    const personalServiceKey = Deno.env.get('PERSONAL_SUPABASE_SERVICE_KEY') ?? ''
     
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    if (!personalServiceKey) {
+      console.error('[AUTO_UPDATE] PERSONAL_SUPABASE_SERVICE_KEY não configurada!')
+      throw new Error('PERSONAL_SUPABASE_SERVICE_KEY não configurada')
+    }
+    
+    const supabase = createClient(PERSONAL_SUPABASE_URL, personalServiceKey)
 
+    // Obter hora atual em Brasília (UTC-3)
     const now = new Date()
-    const currentHour = now.getHours()
-    const currentMinute = now.getMinutes()
+    const brasiliaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+    const currentHour = brasiliaTime.getHours()
+    const currentMinute = brasiliaTime.getMinutes()
     const currentTotalMinutes = currentHour * 60 + currentMinute
 
     console.log(`[AUTO_UPDATE] Iniciando verificação - ${now.toISOString()}`)
-    console.log(`[AUTO_UPDATE] Hora atual: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`)
+    console.log(`[AUTO_UPDATE] Hora de Brasília: ${currentHour}:${currentMinute.toString().padStart(2, '0')}`)
 
     // Busca todos os schedules
     const { data: schedules, error: scheduleError } = await supabase
