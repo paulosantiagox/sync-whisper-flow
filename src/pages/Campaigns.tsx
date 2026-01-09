@@ -24,7 +24,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { SortableControls } from '@/components/ui/sortable-controls';
 import { toast } from 'sonner';
-import { Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Edit2, Trash2, Tag, Filter, Copy, Zap, Check, Loader2, Pin } from 'lucide-react';
+import { Plus, Megaphone, Send, Calendar, ChevronRight, ChevronDown, Edit2, Trash2, Tag, Filter, Copy, Zap, Check, Loader2, Pin, Settings } from 'lucide-react';
+import BroadcastTemplateConfigModal, { getBroadcastTemplate } from '@/components/modals/BroadcastTemplateConfigModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -46,6 +47,8 @@ const Campaigns = () => {
   const [campaignsOpen, setCampaignsOpen] = useState(true);
   const [shortcutsOpen, setShortcutsOpen] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedBroadcastId, setCopiedBroadcastId] = useState<string | null>(null);
+  const [isTemplateConfigOpen, setIsTemplateConfigOpen] = useState(false);
   const [editBroadcast, setEditBroadcast] = useState<Broadcast | null>(null);
   const [isNewBroadcastOpen, setIsNewBroadcastOpen] = useState(false);
   const [editActionType, setEditActionType] = useState<ActionType | null>(null);
@@ -203,6 +206,36 @@ const Campaigns = () => {
       setCopiedId(shortcut.id);
       toast.success(`"${shortcut.name}" copiado!`);
       setTimeout(() => setCopiedId(null), 2000);
+    } catch { toast.error("Erro ao copiar"); }
+  };
+
+  const handleCopyBroadcast = async (broadcast: Broadcast) => {
+    try {
+      const actionType = actionTypes.find(at => at.id === broadcast.actionTypeId);
+      const phoneNum = allNumbers.find(n => n.id === broadcast.phoneNumberId);
+      const status = getStatusOption(broadcast.status);
+      
+      const qualityEmoji = phoneNum?.qualityRating === 'HIGH' ? '🟢 Alta' : 
+                          phoneNum?.qualityRating === 'MEDIUM' ? '🟡 Média' : '🔴 Baixa';
+      
+      const template = getBroadcastTemplate();
+      
+      let message = template
+        .replace(/{data}/g, format(new Date(broadcast.date), "dd/MM/yyyy", { locale: ptBR }))
+        .replace(/{hora}/g, broadcast.time)
+        .replace(/{conta}/g, phoneNum?.customName || phoneNum?.verifiedName || 'N/A')
+        .replace(/{qualidade}/g, qualityEmoji)
+        .replace(/{lista}/g, broadcast.listName)
+        .replace(/{template}/g, broadcast.templateUsed)
+        .replace(/{contatos}/g, broadcast.contactCount.toLocaleString())
+        .replace(/{tipo}/g, actionType?.name || 'N/A')
+        .replace(/{status}/g, status.label)
+        .replace(/{observacoes}/g, broadcast.observations ? `📝 *Obs:* ${broadcast.observations}` : '');
+      
+      await navigator.clipboard.writeText(message.trim());
+      setCopiedBroadcastId(broadcast.id);
+      toast.success('Resumo do disparo copiado!');
+      setTimeout(() => setCopiedBroadcastId(null), 2000);
     } catch { toast.error("Erro ao copiar"); }
   };
 
@@ -404,6 +437,10 @@ const Campaigns = () => {
                         </div>
                       </DialogContent>
                     </Dialog>
+                    <Button size="sm" variant="outline" onClick={() => setIsTemplateConfigOpen(true)}>
+                      <Settings className="w-4 h-4 mr-1" />
+                      Config. Cópia
+                    </Button>
                     <Button size="sm" onClick={() => { setEditBroadcast(null); setIsNewBroadcastOpen(true); }}><Plus className="w-4 h-4 mr-1" />Registrar Disparo</Button>
                   </div>
                 </CardHeader>
@@ -433,6 +470,25 @@ const Campaigns = () => {
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <div className="flex justify-end gap-1">
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-8 w-8" 
+                                            onClick={() => handleCopyBroadcast(broadcast)}
+                                          >
+                                            {copiedBroadcastId === broadcast.id ? (
+                                              <Check className="w-4 h-4 text-success" />
+                                            ) : (
+                                              <Copy className="w-4 h-4" />
+                                            )}
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Copiar resumo para WhatsApp</TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
                                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setEditBroadcast(broadcast); setIsNewBroadcastOpen(true); }}><Edit2 className="w-4 h-4" /></Button>
                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteItem({ type: 'broadcast', item: broadcast })}><Trash2 className="w-4 h-4" /></Button>
                                   </div>
@@ -517,6 +573,8 @@ const Campaigns = () => {
           </form>
         </DialogContent>
       </Dialog>
+
+      <BroadcastTemplateConfigModal open={isTemplateConfigOpen} onOpenChange={setIsTemplateConfigOpen} />
     </DashboardLayout>
   );
 };
