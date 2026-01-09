@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
     console.log('[AUTO_UPDATE] ========================================')
     console.log('[AUTO_UPDATE] Iniciando verificação -', new Date().toISOString())
     console.log('[AUTO_UPDATE] Service Key presente:', !!personalServiceKey)
-    console.log('[AUTO_UPDATE] Service Key length:', personalServiceKey?.length || 0)
     
     if (!personalServiceKey) {
       console.error('[AUTO_UPDATE] PERSONAL_SUPABASE_SERVICE_KEY não configurada!')
@@ -33,6 +32,18 @@ Deno.serve(async (req) => {
     const supabase = createClient(PERSONAL_SUPABASE_URL, personalServiceKey, {
       auth: { persistSession: false }
     })
+
+    // Verificar se é um teste forçado para um projeto específico
+    let forceProjectId: string | null = null
+    try {
+      const body = await req.json()
+      if (body?.projectId) {
+        forceProjectId = body.projectId
+        console.log('[AUTO_UPDATE] MODO TESTE - Projeto forçado:', forceProjectId)
+      }
+    } catch {
+      // Sem body, execução normal
+    }
 
     // Obter hora atual em Brasília (UTC-3)
     const now = new Date()
@@ -48,41 +59,43 @@ Deno.serve(async (req) => {
 
     console.log(`[AUTO_UPDATE] Hora de Brasília: ${brasiliaTime} (${currentTotalMinutes} minutos)`)
 
-    // Busca todos os schedules - SEM FILTRO para debug
+    // Busca todos os schedules
     console.log('[AUTO_UPDATE] Buscando schedules...')
     const { data: schedules, error: scheduleError } = await supabase
       .from('project_update_schedules')
       .select('*')
 
-    console.log('[AUTO_UPDATE] Query executada')
-    console.log('[AUTO_UPDATE] Erro:', scheduleError ? JSON.stringify(scheduleError) : 'null')
-    console.log('[AUTO_UPDATE] Schedules raw:', JSON.stringify(schedules))
     console.log(`[AUTO_UPDATE] Total schedules: ${schedules?.length || 0}`)
 
     if (scheduleError) {
       console.error('[AUTO_UPDATE] Erro ao buscar schedules:', scheduleError)
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: scheduleError.message,
-          debug: { scheduleError }
-        }),
+        JSON.stringify({ success: false, error: scheduleError.message }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       )
     }
 
-    // Filtra schedules que estão dentro da janela de 2 minutos
-    const matchingSchedules = (schedules || []).filter(s => {
-      const [h, m] = s.time.split(':').map(Number)
-      const scheduledMinutes = h * 60 + m
-      const diff = Math.abs(scheduledMinutes - currentTotalMinutes)
-      console.log(`[AUTO_UPDATE] Schedule ${s.time}: ${scheduledMinutes} min, diff: ${diff}`)
-      return diff <= 2
-    })
+    let projectIds: string[]
+    let matchingSchedules: typeof schedules
 
-    const projectIds = [...new Set(matchingSchedules.map(s => s.project_id))]
+    if (forceProjectId) {
+      // MODO TESTE: Atualiza apenas o projeto especificado, ignora horários
+      projectIds = [forceProjectId]
+      matchingSchedules = (schedules || []).filter(s => s.project_id === forceProjectId)
+      console.log(`[AUTO_UPDATE] MODO TESTE - Forçando atualização do projeto: ${forceProjectId}`)
+    } else {
+      // MODO NORMAL: Filtra schedules que estão dentro da janela de 2 minutos
+      matchingSchedules = (schedules || []).filter(s => {
+        const [h, m] = s.time.split(':').map(Number)
+        const scheduledMinutes = h * 60 + m
+        const diff = Math.abs(scheduledMinutes - currentTotalMinutes)
+        console.log(`[AUTO_UPDATE] Schedule ${s.time}: ${scheduledMinutes} min, diff: ${diff}`)
+        return diff <= 2
+      })
+      projectIds = [...new Set(matchingSchedules.map(s => s.project_id))]
+    }
     
-    console.log(`[AUTO_UPDATE] Schedules correspondentes: ${matchingSchedules.length}`)
+    console.log(`[AUTO_UPDATE] Schedules correspondentes: ${matchingSchedules?.length || 0}`)
     console.log(`[AUTO_UPDATE] Projetos para atualizar: ${projectIds.length}`)
 
     let totalUpdated = 0

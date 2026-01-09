@@ -150,9 +150,11 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
   const handleTestNow = async () => {
     setIsTesting(true);
     try {
+      // Envia o projectId para forçar atualização apenas deste projeto
       const response = await fetch(EDGE_FUNCTION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
       });
       const result = await response.json();
       
@@ -160,7 +162,7 @@ export default function UpdateScheduleModal({ projectId, open, onOpenChange }: U
 
       if (result.success) {
         toast.success(
-          `Teste executado! ${result.schedulesFound} agendamentos encontrados, ${result.numbersUpdated} números verificados.`,
+          `Teste executado! ${result.numbersUpdated} números verificados neste projeto.`,
           { duration: 5000 }
         );
         refetchLastLog();
