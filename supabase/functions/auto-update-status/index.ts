@@ -111,8 +111,8 @@ Deno.serve(async (req) => {
         const { data: numbers, error: numbersError } = await supabase
           .from('whatsapp_numbers')
           .select('*')
-          .eq('bm_id', bm.id)
-          .eq('is_active', true)
+          .eq('business_manager_id', bm.id)
+          .eq('is_visible', true)
 
         if (numbersError) {
           console.error(`[AUTO_UPDATE] Erro ao buscar números:`, numbersError)
@@ -138,7 +138,7 @@ Deno.serve(async (req) => {
 
             const newQuality = mapQuality(metaData.quality_rating)
             const newLimit = mapLimit(metaData.messaging_limit_tier)
-            const hasChanged = num.quality_rating !== newQuality || num.messaging_limit !== newLimit
+            const hasChanged = num.quality_rating !== newQuality || num.messaging_limit_tier !== newLimit
 
             console.log(`[AUTO_UPDATE] ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
 
@@ -147,10 +147,10 @@ Deno.serve(async (req) => {
               .from('whatsapp_numbers')
               .update({
                 quality_rating: newQuality,
-                messaging_limit: newLimit,
+                messaging_limit_tier: newLimit,
                 verified_name: metaData.verified_name || num.verified_name,
                 display_phone_number: metaData.display_phone_number || num.display_phone_number,
-                last_checked_at: new Date().toISOString(),
+                last_checked: new Date().toISOString(),
               })
               .eq('id', num.id)
 
@@ -164,7 +164,7 @@ Deno.serve(async (req) => {
             await supabase.from('status_history').insert({
               phone_number_id: num.id,
               quality_rating: newQuality,
-              messaging_limit: newLimit,
+              messaging_limit_tier: newLimit,
               is_automatic: true,
               observation: hasChanged 
                 ? `Status alterado de ${num.quality_rating} para ${newQuality} (automático)` 
