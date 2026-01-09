@@ -21,7 +21,8 @@ interface UpdateScheduleModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const EDGE_FUNCTION_URL = 'https://dfrfeirfllwmdkenylwk.supabase.co/functions/v1/auto-update-status';
+// Edge Function está hospedada no Lovable Cloud, mas acessa dados do Supabase pessoal
+const EDGE_FUNCTION_URL = 'https://uvtjrgfouqmwopekbuxd.supabase.co/functions/v1/auto-update-status';
 const MAX_SCHEDULES = 6;
 const RECOMMENDED_SCHEDULES = 4;
 
@@ -94,9 +95,8 @@ function TimeInput({
 
 type ScheduleStatus = 'waiting' | 'executed' | 'missed' | 'next';
 
-// Determina o status do schedule baseado em logs reais
-function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): ScheduleStatus {
-  // Obtém hora atual de Brasília de forma segura
+// Obtém hora atual de Brasília de forma segura
+function getCurrentBrasiliaTime(): { hours: number; minutes: number; formatted: string } {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('pt-BR', {
     timeZone: 'America/Sao_Paulo',
@@ -104,9 +104,14 @@ function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): 
     minute: '2-digit',
     hour12: false
   });
-  const currentTime = formatter.format(now);
-  
-  const [currentH, currentM] = currentTime.split(':').map(Number);
+  const formatted = formatter.format(now);
+  const [hours, minutes] = formatted.split(':').map(Number);
+  return { hours, minutes, formatted };
+}
+
+// Determina o status do schedule baseado na hora atual e logs
+function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): ScheduleStatus {
+  const { hours: currentH, minutes: currentM } = getCurrentBrasiliaTime();
   const [schedH, schedM] = scheduleTime.split(':').map(Number);
   
   const currentMinutes = currentH * 60 + currentM;
@@ -124,19 +129,18 @@ function getScheduleStatus(scheduleTime: string, lastLogBrasiliaTime?: string): 
   }
 
   // Se já passou do horário, verifica se foi executado
-  // Checa se o último log corresponde a este horário (mesma hora aproximada)
+  // Checa se existe um log que corresponde a este horário
   if (lastLogBrasiliaTime) {
     const [logH, logM] = lastLogBrasiliaTime.split(':').map(Number);
     const logMinutes = logH * 60 + logM;
-    const logDiff = Math.abs(logMinutes - schedMinutes);
     
-    // Se o log foi dentro de 5 minutos do horário agendado, consideramos executado
-    if (logDiff <= 5) {
+    // Se o log foi DEPOIS do horário agendado (ou muito próximo), consideramos executado
+    if (logMinutes >= schedMinutes - 2) {
       return 'executed';
     }
   }
 
-  // Passou do horário e não há evidência de execução
+  // Passou do horário e não há evidência de execução para este horário
   return 'missed';
 }
 
@@ -180,7 +184,7 @@ function ScheduleStatusIndicator({ status }: { status: ScheduleStatus }) {
 
 export default function UpdateScheduleModal({ projectId, open, onOpenChange }: UpdateScheduleModalProps) {
   const { data: schedules = [], isLoading } = useProjectSchedules(projectId);
-  const { data: lastLog, refetch: refetchLastLog } = useLastAutoUpdateLog();
+  const { data: lastLog, refetch: refetchLastLog } = useLastAutoUpdateLog(projectId);
   const createSchedule = useCreateProjectSchedule();
   const updateSchedule = useUpdateProjectSchedule();
   const deleteSchedule = useDeleteProjectSchedule();

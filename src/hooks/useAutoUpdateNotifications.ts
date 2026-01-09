@@ -2,9 +2,11 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { playNotificationSound } from '@/lib/sounds';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function useAutoUpdateNotifications(projectId: string | undefined) {
   const lastUpdateRef = useRef<string | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!projectId) return;
@@ -20,48 +22,40 @@ export function useAutoUpdateNotifications(projectId: string | undefined) {
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
+          const newQuality = payload.new?.quality_rating;
+          const oldQuality = payload.old?.quality_rating;
+
+          // SÓ notifica se houve MUDANÇA de status
+          // Ignora atualizações de last_checked sem mudança de qualidade
+          if (newQuality === oldQuality) {
+            // Apenas atualiza a query sem notificar
+            queryClient.invalidateQueries({ queryKey: ['whatsapp-numbers', projectId] });
+            return;
+          }
+
           // Evita múltiplos toasts para a mesma atualização
-          const updateId = `${payload.new?.id}-${payload.new?.last_checked}`;
+          const updateId = `${payload.new?.id}-${newQuality}-${payload.new?.last_checked}`;
           if (lastUpdateRef.current === updateId) return;
           lastUpdateRef.current = updateId;
 
-          // Verifica se foi uma atualização automática (vindo da Edge Function)
-          // Comparando o timestamp para ver se é recente
-          const lastChecked = payload.new?.last_checked;
-          if (lastChecked) {
-            const checkedTime = new Date(lastChecked).getTime();
-            const now = Date.now();
-            const diff = now - checkedTime;
-            
-            // Se a atualização foi feita nos últimos 5 segundos, mostra notificação
-            if (diff < 5000) {
-              const phoneNumber = payload.new?.display_phone_number || 'Número';
-              const newQuality = payload.new?.quality_rating;
-              const oldQuality = payload.old?.quality_rating;
-
-              if (newQuality !== oldQuality) {
-                // Mudança de status
-                const direction = getQualityDirection(oldQuality, newQuality);
-                if (direction === 'up') {
-                  toast.success(`📈 ${phoneNumber} subiu para ${newQuality}`, {
-                    description: 'Atualização automática',
-                  });
-                  playNotificationSound('success');
-                } else {
-                  toast.error(`📉 ${phoneNumber} caiu para ${newQuality}`, {
-                    description: 'Atualização automática',
-                  });
-                  playNotificationSound('error');
-                }
-              } else {
-                // Verificação sem mudança - notifica apenas se for a primeira do batch
-                toast.info('🔄 Verificação automática realizada', {
-                  description: `${phoneNumber} verificado`,
-                });
-                playNotificationSound('info');
-              }
-            }
+          const phoneNumber = payload.new?.display_phone_number || 'Número';
+          
+          // Mudança de status
+          const direction = getQualityDirection(oldQuality, newQuality);
+          if (direction === 'up') {
+            toast.success(`📈 ${phoneNumber} subiu para ${newQuality}`, {
+              description: 'Atualização automática',
+            });
+            playNotificationSound('success');
+          } else {
+            toast.error(`📉 ${phoneNumber} caiu para ${newQuality}`, {
+              description: 'Atualização automática',
+            });
+            playNotificationSound('error');
           }
+
+          // Atualiza queries
+          queryClient.invalidateQueries({ queryKey: ['whatsapp-numbers', projectId] });
         }
       )
       .subscribe();
@@ -69,7 +63,7 @@ export function useAutoUpdateNotifications(projectId: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId]);
+  }, [projectId, queryClient]);
 }
 
 function getQualityDirection(oldQuality: string, newQuality: string): 'up' | 'down' {
