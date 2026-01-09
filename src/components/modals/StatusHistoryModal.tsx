@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
-import { WhatsAppNumber, StatusHistory } from '@/types';
+import { WhatsAppNumber } from '@/types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { History, Download, TrendingUp, TrendingDown, Clock, Calendar, Phone, AlertCircle, XCircle, Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { History, Download, TrendingUp, TrendingDown, Clock, Calendar, Phone, Loader2 } from 'lucide-react';
 import { format, subDays, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { useStatusHistory } from '@/hooks/useStatusHistory';
+import { useGroupedStatusHistory } from '@/hooks/useStatusHistory';
+import DailyHistoryItem from '@/components/history/DailyHistoryItem';
 
 interface StatusHistoryModalProps {
   number: WhatsAppNumber | null;
@@ -19,18 +19,20 @@ interface StatusHistoryModalProps {
 
 const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalProps) => {
   const [periodFilter, setPeriodFilter] = useState('30');
-  const { data: allHistory = [], isLoading } = useStatusHistory(number?.id);
+  const { data: groupedHistory = [], allHistory = [], isLoading } = useGroupedStatusHistory(number?.id);
 
-  const numberHistory = useMemo(() => {
-    if (!number || !allHistory.length) return [];
+  // Filtra os grupos por período
+  const filteredGroups = useMemo(() => {
+    if (!groupedHistory.length) return [];
     
     const filterDate = subDays(new Date(), parseInt(periodFilter));
     
-    return allHistory
-      .filter(h => isAfter(new Date(h.changedAt), filterDate))
-      .sort((a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime());
-  }, [number, periodFilter, allHistory]);
+    return groupedHistory.filter(group => 
+      isAfter(new Date(group.date + 'T23:59:59'), filterDate)
+    );
+  }, [groupedHistory, periodFilter]);
 
+  // Estatísticas gerais
   const stats = useMemo(() => {
     if (!number || !allHistory.length) return null;
     
@@ -47,14 +49,22 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
       ? ratingValues[newest.qualityRating] - ratingValues[oldest.qualityRating]
       : 0;
 
-    return { highCount, mediumCount, lowCount, lastDrop: lastDrop ? new Date(lastDrop.changedAt) : null, trend };
-  }, [number, allHistory]);
+    return { 
+      highCount, 
+      mediumCount, 
+      lowCount, 
+      lastDrop: lastDrop ? new Date(lastDrop.changedAt) : null, 
+      trend,
+      totalDays: groupedHistory.length,
+      totalVerifications: allHistory.length
+    };
+  }, [number, allHistory, groupedHistory]);
 
   const exportToCSV = () => {
-    if (!number || !numberHistory.length) return;
+    if (!number || !allHistory.length) return;
 
     const headers = ['Data/Hora', 'Status Anterior', 'Status Atual', 'Limite', 'Observação'];
-    const rows = numberHistory.map(h => [
+    const rows = allHistory.map(h => [
       format(new Date(h.changedAt), "dd/MM/yyyy HH:mm", { locale: ptBR }),
       h.previousQuality || '-',
       h.qualityRating,
@@ -87,7 +97,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="w-5 h-5 text-primary" />
@@ -95,6 +105,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
           </DialogTitle>
         </DialogHeader>
 
+        {/* Info do Número */}
         <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Phone className="w-5 h-5 text-primary" />
@@ -103,9 +114,11 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
             {number.customName && <p className="text-sm font-semibold">{number.customName}</p>}
             <p className="text-sm text-muted-foreground">{number.verifiedName} • {number.displayPhoneNumber}</p>
           </div>
+          <div>{getStatusBadge(number.qualityRating)}</div>
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
+          {/* Cards de Estatísticas */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Card className="p-3">
@@ -121,20 +134,21 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
                 </div>
               </Card>
               <Card className="p-3">
-                <div className="text-xs text-muted-foreground mb-1">Tempo em Alta</div>
-                <div className="font-semibold text-success">{stats.highCount} registros</div>
+                <div className="text-xs text-muted-foreground mb-1">Dias Monitorados</div>
+                <div className="font-semibold">{stats.totalDays} dias</div>
+              </Card>
+              <Card className="p-3">
+                <div className="text-xs text-muted-foreground mb-1">Total Verificações</div>
+                <div className="font-semibold">{stats.totalVerifications}</div>
               </Card>
               <Card className="p-3">
                 <div className="text-xs text-muted-foreground mb-1">Última Queda</div>
                 <div className="font-semibold">{stats.lastDrop ? format(stats.lastDrop, "dd/MM/yyyy", { locale: ptBR }) : 'Nenhuma'}</div>
               </Card>
-              <Card className="p-3">
-                <div className="text-xs text-muted-foreground mb-1">Status Atual</div>
-                {getStatusBadge(number.qualityRating)}
-              </Card>
             </div>
           )}
 
+          {/* Filtros e Export */}
           <div className="flex items-center justify-between gap-4">
             <Select value={periodFilter} onValueChange={setPeriodFilter}>
               <SelectTrigger className="w-[180px]">
@@ -155,39 +169,25 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
             </Button>
           </div>
 
-          <div className="flex-1 overflow-auto rounded-lg border">
-            {isLoading ? (
-              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-            ) : numberHistory.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Atualizado em</TableHead>
-                    <TableHead>Status Anterior</TableHead>
-                    <TableHead>Status Atual</TableHead>
-                    <TableHead>Limite</TableHead>
-                    <TableHead>Observação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {numberHistory.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="font-medium">{format(new Date(entry.changedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
-                      <TableCell>{entry.previousQuality ? getStatusBadge(entry.previousQuality) : '-'}</TableCell>
-                      <TableCell>{getStatusBadge(entry.qualityRating)}</TableCell>
-                      <TableCell className="text-muted-foreground">{entry.messagingLimitTier}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground min-w-[250px]">{entry.observation || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="p-8 text-center">
-                <History className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-                <p className="text-muted-foreground">Nenhum histórico encontrado para o período selecionado</p>
-              </div>
-            )}
-          </div>
+          {/* Lista de Dias (Expandível) */}
+          <ScrollArea className="flex-1 rounded-lg border">
+            <div className="p-4 space-y-3">
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : filteredGroups.length > 0 ? (
+                filteredGroups.map((dayGroup) => (
+                  <DailyHistoryItem key={dayGroup.date} dayGroup={dayGroup} />
+                ))
+              ) : (
+                <div className="p-8 text-center">
+                  <History className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-muted-foreground">Nenhum histórico encontrado para o período selecionado</p>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>

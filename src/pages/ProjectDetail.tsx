@@ -11,8 +11,7 @@ import QualityBadge from '@/components/dashboard/QualityBadge';
 import { useProject } from '@/hooks/useProjects';
 import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, useDeleteWhatsAppNumber } from '@/hooks/useWhatsAppNumbers';
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
-import { useCreateStatusHistory, useUpdateLastStatusHistory, useUpdateOrCreateDailyHistory } from '@/hooks/useStatusHistory';
-import { useCreateStatusChangeNotification, useStatusChangeNotifications, useClearNumberNotifications } from '@/hooks/useStatusHistory';
+import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification } from '@/hooks/useStatusHistory';
 import { WhatsAppNumber, BusinessManager, StatusChangeNotification } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { supabase } from '@/lib/supabase';
@@ -61,8 +60,6 @@ const ProjectDetail = () => {
   const updateBM = useUpdateBusinessManager();
   const deleteBMMutation = useDeleteBusinessManager();
   const createStatusHistory = useCreateStatusHistory();
-  const updateLastHistory = useUpdateLastStatusHistory();
-  const updateOrCreateDailyHistory = useUpdateOrCreateDailyHistory();
   const createNotification = useCreateStatusChangeNotification();
   const clearNotifications = useClearNumberNotifications();
 
@@ -141,50 +138,40 @@ const ProjectDetail = () => {
         const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
         const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
 
-        // Regra: cria registro quando houver mudança OU primeira verificação
-        // Se não há mudança e já existe histórico, apenas atualiza o timestamp do último registro
-        if (hasChanged || !existingHistory.has(number.id)) {
-          if (hasChanged) {
-            const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
-            const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
+        // Regra: SEMPRE cria registro para cada verificação (permite ver histórico completo por dia)
+        if (hasChanged) {
+          const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+          const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
 
-            createNotification.mutate({
-              phoneNumberId: number.id,
-              projectId: id || '',
-              previousQuality: number.qualityRating,
-              newQuality: newQuality,
-              direction: direction as 'up' | 'down',
-              changedAt: new Date().toISOString(),
-            });
+          createNotification.mutate({
+            phoneNumberId: number.id,
+            projectId: id || '',
+            previousQuality: number.qualityRating,
+            newQuality: newQuality,
+            direction: direction as 'up' | 'down',
+            changedAt: new Date().toISOString(),
+          });
 
-            createStatusHistory.mutate({
-              phoneNumberId: number.id,
-              qualityRating: newQuality,
-              messagingLimitTier: newLimit,
-              previousQuality: number.qualityRating,
-              changedAt: new Date().toISOString(),
-              observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
-            });
-          } else {
-            // Primeira verificação - cria registro inicial
-            createStatusHistory.mutate({
-              phoneNumberId: number.id,
-              qualityRating: newQuality,
-              messagingLimitTier: newLimit,
-              changedAt: new Date().toISOString(),
-              observation: 'Primeira verificação',
-            });
-          }
-
-          existingHistory.add(number.id);
-        } else {
-          // Não houve mudança e já existe histórico - verifica se é mesmo dia ou novo dia
-          updateOrCreateDailyHistory.mutate({
+          createStatusHistory.mutate({
             phoneNumberId: number.id,
             qualityRating: newQuality,
             messagingLimitTier: newLimit,
+            previousQuality: number.qualityRating,
+            changedAt: new Date().toISOString(),
+            observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
+          });
+        } else {
+          // Sem mudança - cria registro de verificação
+          createStatusHistory.mutate({
+            phoneNumberId: number.id,
+            qualityRating: newQuality,
+            messagingLimitTier: newLimit,
+            changedAt: new Date().toISOString(),
+            observation: existingHistory.has(number.id) ? 'Verificação manual' : 'Primeira verificação',
           });
         }
+
+        existingHistory.add(number.id);
 
         updateNumber.mutate({
           id: number.id,
@@ -209,7 +196,7 @@ const ProjectDetail = () => {
     } else {
       toast.success(`${successCount} números verificados com sucesso.`);
     }
-  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification, updateOrCreateDailyHistory]);
+  }, [numbers, projectBMs, id, updateNumber, createStatusHistory, createNotification]);
 
   const handleSaveNumber = (numberId: string, data: Partial<WhatsAppNumber>) => {
     updateNumber.mutate({ id: numberId, projectId: id || '', ...data });
