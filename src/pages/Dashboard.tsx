@@ -9,6 +9,7 @@ import { useRecentStatusChanges } from '@/hooks/useRecentStatusChanges';
 import { Users, FolderKanban, Phone, Megaphone, Activity, TrendingUp, TrendingDown, ArrowRight, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import QualityBadge from '@/components/dashboard/QualityBadge';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -51,6 +52,15 @@ const getQualityLabel = (quality: string) => {
     case 'MEDIUM': return 'Média';
     case 'LOW': return 'Baixa';
     default: return quality;
+  }
+};
+
+const getQualityColor = (quality: string) => {
+  switch (quality) {
+    case 'HIGH': return 'text-emerald-600';
+    case 'MEDIUM': return 'text-amber-500';
+    case 'LOW': return 'text-red-500';
+    default: return 'text-muted-foreground';
   }
 };
 
@@ -111,13 +121,24 @@ const UserDashboard = () => {
                         : <TrendingDown className="w-4 h-4" />
                       }
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{change.numberName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {getQualityLabel(change.previousQuality)} → {getQualityLabel(change.currentQuality)}
-                        <span className="mx-1">•</span>
-                        {change.projectName}
-                      </p>
+                    <div className="flex items-center gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{change.numberName}</p>
+                          <QualityBadge rating={change.currentQuality} size="sm" />
+                        </div>
+                        <p className="text-xs">
+                          <span className={getQualityColor(change.previousQuality)}>
+                            {getQualityLabel(change.previousQuality)}
+                          </span>
+                          <span className="text-muted-foreground"> → </span>
+                          <span className={getQualityColor(change.currentQuality)}>
+                            {getQualityLabel(change.currentQuality)}
+                          </span>
+                          <span className="mx-1 text-muted-foreground">•</span>
+                          <span className="text-muted-foreground">{change.projectName}</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
