@@ -5,10 +5,13 @@ import ProjectCard from '@/components/dashboard/ProjectCard';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllWhatsAppNumbers } from '@/hooks/useWhatsAppNumbers';
 import { useUsers } from '@/hooks/useUsers';
+import { useRecentStatusChanges } from '@/hooks/useRecentStatusChanges';
 import { Users, FolderKanban, Phone, Megaphone, Activity, TrendingUp, TrendingDown, ArrowRight, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const MasterDashboard = () => {
   const { data: users = [] } = useUsers();
@@ -42,10 +45,22 @@ const MasterDashboard = () => {
   );
 };
 
+const getQualityLabel = (quality: string) => {
+  switch (quality) {
+    case 'HIGH': return 'Alta';
+    case 'MEDIUM': return 'Média';
+    case 'LOW': return 'Baixa';
+    default: return quality;
+  }
+};
+
 const UserDashboard = () => {
   const { user } = useAuth();
   const { data: projects = [], isLoading } = useProjects();
   const { data: allNumbers = [] } = useAllWhatsAppNumbers();
+  
+  const projectIds = projects.map(p => p.id);
+  const { data: recentChanges = [] } = useRecentStatusChanges(projectIds);
 
   const userNumbers = allNumbers.filter(n => projects.some(p => p.id === n.projectId));
 
@@ -67,6 +82,56 @@ const UserDashboard = () => {
         <StatsCard title="Campanhas Ativas" value={0} icon={Megaphone} />
         <StatsCard title="Status dos Números" value={`${statusCounts.high}/${statusCounts.medium}/${statusCounts.low}`} subtitle="Alta / Média / Baixa" icon={Activity} />
       </div>
+
+      {/* Mudanças de Status Recentes */}
+      {recentChanges.length > 0 && (
+        <Card className="mb-6 animate-slide-up">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Activity className="w-5 h-5 text-primary" />
+              Mudanças de Status Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="space-y-1">
+              {recentChanges.map((change) => (
+                <Link
+                  key={change.id}
+                  to={`/projects/${change.projectId}`}
+                  className="flex items-center justify-between py-3 px-2 -mx-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      change.direction === 'up' 
+                        ? 'bg-emerald-500/10 text-emerald-500' 
+                        : 'bg-red-500/10 text-red-500'
+                    }`}>
+                      {change.direction === 'up' 
+                        ? <TrendingUp className="w-4 h-4" /> 
+                        : <TrendingDown className="w-4 h-4" />
+                      }
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{change.numberName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {getQualityLabel(change.previousQuality)} → {getQualityLabel(change.currentQuality)}
+                        <span className="mx-1">•</span>
+                        {change.projectName}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(change.changedAt), "dd/MM", { locale: ptBR })}
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="space-y-6">
         <div className="flex items-center justify-between">
