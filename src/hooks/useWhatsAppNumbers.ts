@@ -66,6 +66,8 @@ export function useWhatsAppNumbers(projectId?: string) {
         observation: n.observation || undefined,
         createdAt: n.created_at,
         lastChecked: n.last_checked,
+        previousQuality: n.previous_quality as QualityRating | undefined,
+        lastStatusChange: n.last_status_change || undefined,
       }));
     },
     enabled: projectId !== undefined,
@@ -100,6 +102,8 @@ export function useAllWhatsAppNumbers() {
         observation: n.observation || undefined,
         createdAt: n.created_at,
         lastChecked: n.last_checked,
+        previousQuality: n.previous_quality as QualityRating | undefined,
+        lastStatusChange: n.last_status_change || undefined,
       }));
     },
   });
@@ -157,10 +161,11 @@ export function useUpdateWhatsAppNumber() {
       isVisible: boolean;
       customName: string;
       observation: string;
-      lastChecked: string; // Só atualiza se passado explicitamente
+      lastChecked: string;
+      previousQuality: string;
+      lastStatusChange: string;
     }> }) => {
-      // Monta o objeto de atualização SEM last_checked automático
-      // last_checked só será incluído se updates.lastChecked for explicitamente passado
+      // Monta o objeto de atualização
       const updateData: Record<string, unknown> = {};
       
       if (updates.displayPhoneNumber !== undefined) updateData.display_phone_number = updates.displayPhoneNumber;
@@ -171,11 +176,9 @@ export function useUpdateWhatsAppNumber() {
       if (updates.isVisible !== undefined) updateData.is_visible = updates.isVisible;
       if (updates.customName !== undefined) updateData.custom_name = updates.customName;
       if (updates.observation !== undefined) updateData.observation = updates.observation;
-      
-      // IMPORTANTE: Só atualiza last_checked se foi passado explicitamente
-      if (updates.lastChecked !== undefined) {
-        updateData.last_checked = updates.lastChecked;
-      }
+      if (updates.lastChecked !== undefined) updateData.last_checked = updates.lastChecked;
+      if (updates.previousQuality !== undefined) updateData.previous_quality = updates.previousQuality;
+      if (updates.lastStatusChange !== undefined) updateData.last_status_change = updates.lastStatusChange;
 
       const { error } = await supabase
         .from('whatsapp_numbers')

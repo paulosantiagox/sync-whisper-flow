@@ -11,9 +11,9 @@ import QualityBadge from '@/components/dashboard/QualityBadge';
 import { useProject } from '@/hooks/useProjects';
 import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, useDeleteWhatsAppNumber } from '@/hooks/useWhatsAppNumbers';
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
-import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification } from '@/hooks/useStatusHistory';
+import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification, useAllStatusChangeNotifications } from '@/hooks/useStatusHistory';
 import { useAutoUpdateNotifications } from '@/hooks/useAutoUpdateNotifications';
-import { WhatsAppNumber, BusinessManager } from '@/types';
+import { WhatsAppNumber, BusinessManager, QualityRating } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { playNotificationSound } from '@/lib/sounds';
 import { supabase } from '@/lib/supabase';
@@ -28,7 +28,7 @@ import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, Eye
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type SortOption = 'quality-asc' | 'quality-desc' | 'date-asc' | 'date-desc';
@@ -54,6 +54,7 @@ const ProjectDetail = () => {
   const { data: project, isLoading: projectLoading } = useProject(id || '');
   const { data: numbers = [], isLoading: numbersLoading } = useWhatsAppNumbers(id);
   const { data: projectBMs = [] } = useBusinessManagers(id);
+  const { data: statusNotifications = [] } = useAllStatusChangeNotifications(id);
   
   const updateNumber = useUpdateWhatsAppNumber();
   const createNumber = useCreateWhatsAppNumber();
@@ -64,6 +65,17 @@ const ProjectDetail = () => {
   const createStatusHistory = useCreateStatusHistory();
   const createNotification = useCreateStatusChangeNotification();
   const clearNotifications = useClearNumberNotifications();
+
+  // Mapa de notificações por número para acesso rápido
+  const notificationsByNumber = useMemo(() => {
+    const map = new Map<string, typeof statusNotifications>();
+    statusNotifications.forEach(n => {
+      const existing = map.get(n.phoneNumberId) || [];
+      existing.push(n);
+      map.set(n.phoneNumberId, existing);
+    });
+    return map;
+  }, [statusNotifications]);
 
   // Hook para receber notificações de atualizações automáticas em tempo real
   useAutoUpdateNotifications(id);
@@ -139,12 +151,12 @@ const ProjectDetail = () => {
 
       try {
         const detail = await fetchPhoneNumberDetail(number.phoneNumberId, bm.accessToken);
-        const newQuality = mapMetaQuality(detail.quality_rating);
+        const newQuality = mapMetaQuality(detail.quality_rating) as QualityRating;
         const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
-        const hasChanged = number.qualityRating !== newQuality || number.messagingLimitTier !== newLimit;
+        const hasQualityChanged = number.qualityRating !== newQuality;
 
         // Regra: SEMPRE cria registro para cada verificação (permite ver histórico completo por dia)
-        if (hasChanged) {
+        if (hasQualityChanged) {
           const qualityValue = { HIGH: 3, MEDIUM: 2, LOW: 1 };
           const direction = qualityValue[newQuality] > qualityValue[number.qualityRating] ? 'up' : 'down';
 
@@ -166,7 +178,7 @@ const ProjectDetail = () => {
             observation: `Status alterado de ${number.qualityRating} para ${newQuality}`,
           });
         } else {
-          // Sem mudança - cria registro de verificação
+          // Sem mudança - cria registro de verificação (sem previous_quality pois não mudou)
           createStatusHistory.mutate({
             phoneNumberId: number.id,
             qualityRating: newQuality,
@@ -178,15 +190,23 @@ const ProjectDetail = () => {
 
         existingHistory.add(number.id);
 
+        // Monta os updates - só atualiza previous_quality e last_status_change se a qualidade mudou
+        const updates: Record<string, unknown> = {
+          qualityRating: newQuality,
+          messagingLimitTier: newLimit,
+          verifiedName: detail.verified_name,
+          displayPhoneNumber: detail.display_phone_number,
+          lastChecked: new Date().toISOString(),
+        };
+
+        if (hasQualityChanged) {
+          (updates as any).previousQuality = number.qualityRating;
+          (updates as any).lastStatusChange = new Date().toISOString();
+        }
+
         updateNumber.mutate({
           id: number.id,
-          updates: {
-            qualityRating: newQuality,
-            messagingLimitTier: newLimit,
-            verifiedName: detail.verified_name,
-            displayPhoneNumber: detail.display_phone_number,
-            lastChecked: new Date().toISOString(),
-          }
+          updates: updates as any
         });
 
         successCount++;
@@ -263,6 +283,14 @@ const ProjectDetail = () => {
 
   const renderNumberRow = (number: WhatsAppNumber, isInactive = false) => {
     const bm = projectBMs.find(b => b.id === number.businessManagerId);
+    const numberNotifications = notificationsByNumber.get(number.id) || [];
+    const hasNotifications = numberNotifications.length > 0;
+    const latestNotification = hasNotifications ? numberNotifications[0] : null;
+    
+    // Calcula quantos dias está no status atual
+    const daysInCurrentStatus = number.lastStatusChange 
+      ? differenceInDays(new Date(), new Date(number.lastStatusChange))
+      : null;
     
     return (
       <TooltipProvider key={number.id}>
@@ -279,7 +307,60 @@ const ProjectDetail = () => {
               </div>
             </div>
           </TableCell>
-          <TableCell><QualityBadge rating={number.qualityRating} /></TableCell>
+          <TableCell>
+            <div className="flex items-center gap-2">
+              <QualityBadge rating={number.qualityRating} />
+              {/* Indicador de dias no status atual */}
+              {daysInCurrentStatus !== null && daysInCurrentStatus >= 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-[10px] font-medium text-muted-foreground">
+                      +{daysInCurrentStatus}d
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{daysInCurrentStatus === 0 ? 'Mudou hoje' : `Há ${daysInCurrentStatus} dia${daysInCurrentStatus !== 1 ? 's' : ''} neste status`}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {/* Indicador de notificação de mudança */}
+              {hasNotifications && latestNotification && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`flex items-center gap-0.5 text-[10px] font-medium ${
+                      latestNotification.direction === 'up' ? 'text-emerald-500' : 'text-red-500'
+                    }`}>
+                      {latestNotification.direction === 'up' 
+                        ? <TrendingUp className="w-3 h-3" /> 
+                        : <TrendingDown className="w-3 h-3" />
+                      }
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>
+                      {latestNotification.direction === 'up' ? 'Subiu' : 'Desceu'}: {latestNotification.previousQuality} → {latestNotification.newQuality}
+                      <br />
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(latestNotification.changedAt), "dd/MM HH:mm", { locale: ptBR })}
+                      </span>
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+            {/* Status anterior e data da última mudança */}
+            {number.previousQuality && number.lastStatusChange && (
+              <div className="text-[10px] text-muted-foreground mt-0.5">
+                <span className="opacity-70">
+                  Antes: {number.previousQuality === 'HIGH' ? 'Alta' : number.previousQuality === 'MEDIUM' ? 'Média' : 'Baixa'}
+                </span>
+                <span className="mx-1 opacity-50">•</span>
+                <span className="opacity-60">
+                  {format(new Date(number.lastStatusChange), "dd/MM/yy", { locale: ptBR })}
+                </span>
+              </div>
+            )}
+          </TableCell>
           <TableCell><span className="text-sm">{number.messagingLimitTier}/dia</span></TableCell>
           <TableCell>
             {bm ? (

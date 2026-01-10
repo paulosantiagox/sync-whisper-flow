@@ -181,20 +181,30 @@ Deno.serve(async (req) => {
 
               const newQuality = mapQuality(metaData.quality_rating)
               const newLimit = mapLimit(metaData.messaging_limit_tier)
-              const hasChanged = num.quality_rating !== newQuality || num.messaging_limit_tier !== newLimit
+              const hasQualityChanged = num.quality_rating !== newQuality
+              const hasLimitChanged = num.messaging_limit_tier !== newLimit
 
               console.log(`[AUTO_UPDATE] ${num.display_phone_number}: ${num.quality_rating} -> ${newQuality}`)
+
+              // Monta os dados de atualização
+              const updateData: Record<string, unknown> = {
+                quality_rating: newQuality,
+                messaging_limit_tier: newLimit,
+                verified_name: metaData.verified_name || num.verified_name,
+                display_phone_number: metaData.display_phone_number || num.display_phone_number,
+                last_checked: new Date().toISOString(),
+              }
+
+              // IMPORTANTE: Se a qualidade mudou, salva o status anterior e a data da mudança
+              if (hasQualityChanged) {
+                updateData.previous_quality = num.quality_rating
+                updateData.last_status_change = new Date().toISOString()
+              }
 
               // Atualizar número
               const { error: updateError } = await supabase
                 .from('whatsapp_numbers')
-                .update({
-                  quality_rating: newQuality,
-                  messaging_limit_tier: newLimit,
-                  verified_name: metaData.verified_name || num.verified_name,
-                  display_phone_number: metaData.display_phone_number || num.display_phone_number,
-                  last_checked: new Date().toISOString(),
-                })
+                .update(updateData)
                 .eq('id', num.id)
 
               if (updateError) {
@@ -204,13 +214,15 @@ Deno.serve(async (req) => {
                 continue
               }
 
-              // Registrar no histórico
+              // Registrar no histórico - SEMPRE salva o status atual no momento da verificação
+              // O campo previous_quality no histórico guarda o status ANTES da mudança
               const { error: historyError } = await supabase.from('status_history').insert({
                 phone_number_id: num.id,
                 quality_rating: newQuality,
                 messaging_limit_tier: newLimit,
+                previous_quality: hasQualityChanged ? num.quality_rating : null,
                 changed_at: new Date().toISOString(),
-                observation: hasChanged 
+                observation: hasQualityChanged 
                   ? `Status alterado de ${num.quality_rating} para ${newQuality} (verificação automática)` 
                   : 'Verificação automática',
               })
@@ -221,8 +233,8 @@ Deno.serve(async (req) => {
                 projectErrors++
               }
 
-              // Se mudou, registrar notificação
-              if (hasChanged) {
+              // Se mudou qualidade, registrar notificação
+              if (hasQualityChanged) {
                 const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
                 const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
 

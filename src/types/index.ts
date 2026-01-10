@@ -54,6 +54,8 @@ export interface WhatsAppNumber {
   observation?: string;
   createdAt: string;
   lastChecked: string;
+  previousQuality?: QualityRating;
+  lastStatusChange?: string;
 }
 
 // Status History types
