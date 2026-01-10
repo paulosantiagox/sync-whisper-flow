@@ -326,30 +326,39 @@ const ProjectDetail = () => {
                   </TooltipContent>
                 </Tooltip>
               )}
-              {/* Indicador de notificação de mudança */}
-              {hasNotifications && latestNotification && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={`flex items-center gap-0.5 text-[10px] font-medium ${
-                      latestNotification.direction === 'up' ? 'text-emerald-500' : 'text-red-500'
-                    }`}>
-                      {latestNotification.direction === 'up' 
-                        ? <TrendingUp className="w-3 h-3" /> 
-                        : <TrendingDown className="w-3 h-3" />
-                      }
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>
-                      {latestNotification.direction === 'up' ? 'Subiu' : 'Desceu'}: {latestNotification.previousQuality} → {latestNotification.newQuality}
-                      <br />
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(latestNotification.changedAt), "dd/MM HH:mm", { locale: ptBR })}
+              {/* Indicador de mudança de status - baseado no histórico (permanente) */}
+              {previousQualityFromHistory && statusStartDate && (() => {
+                const qualityOrder = { 'LOW': 1, 'MEDIUM': 2, 'HIGH': 3 };
+                const currentOrder = qualityOrder[number.qualityRating as keyof typeof qualityOrder] || 0;
+                const previousOrder = qualityOrder[previousQualityFromHistory as keyof typeof qualityOrder] || 0;
+                const direction = currentOrder > previousOrder ? 'up' : 'down';
+                const previousLabel = previousQualityFromHistory === 'HIGH' ? 'Alta' : previousQualityFromHistory === 'MEDIUM' ? 'Média' : 'Baixa';
+                const currentLabel = number.qualityRating === 'HIGH' ? 'Alta' : number.qualityRating === 'MEDIUM' ? 'Média' : 'Baixa';
+                
+                return (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className={`flex items-center gap-0.5 text-[10px] font-medium ${
+                        direction === 'up' ? 'text-emerald-500' : 'text-red-500'
+                      }`}>
+                        {direction === 'up' 
+                          ? <TrendingUp className="w-3 h-3" /> 
+                          : <TrendingDown className="w-3 h-3" />
+                        }
                       </span>
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>
+                        {direction === 'up' ? 'Subiu' : 'Desceu'}: {previousLabel} → {currentLabel}
+                        <br />
+                        <span className="text-xs text-muted-foreground">
+                          {format(statusStartDate, "dd/MM HH:mm", { locale: ptBR })}
+                        </span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })()}
             </div>
             {/* Status anterior e data - calculado do histórico */}
             {statusStartDate && (
