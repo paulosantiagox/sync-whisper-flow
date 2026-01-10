@@ -13,6 +13,7 @@ import { useWhatsAppNumbers, useUpdateWhatsAppNumber, useCreateWhatsAppNumber, u
 import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager, useDeleteBusinessManager } from '@/hooks/useBusinessManagers';
 import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification, useAllStatusChangeNotifications } from '@/hooks/useStatusHistory';
 import { useAutoUpdateNotifications } from '@/hooks/useAutoUpdateNotifications';
+import { useNumberStatusInfo } from '@/hooks/useNumberStatusInfo';
 import { WhatsAppNumber, BusinessManager, QualityRating } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { playNotificationSound } from '@/lib/sounds';
@@ -28,7 +29,7 @@ import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, Eye
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 type SortOption = 'quality-asc' | 'quality-desc' | 'date-asc' | 'date-desc';
@@ -55,6 +56,7 @@ const ProjectDetail = () => {
   const { data: numbers = [], isLoading: numbersLoading } = useWhatsAppNumbers(id);
   const { data: projectBMs = [] } = useBusinessManagers(id);
   const { data: statusNotifications = [] } = useAllStatusChangeNotifications(id);
+  const { statusInfoMap } = useNumberStatusInfo(numbers);
   
   const updateNumber = useUpdateWhatsAppNumber();
   const createNumber = useCreateWhatsAppNumber();
@@ -287,10 +289,11 @@ const ProjectDetail = () => {
     const hasNotifications = numberNotifications.length > 0;
     const latestNotification = hasNotifications ? numberNotifications[0] : null;
     
-    // Calcula quantos dias está no status atual
-    const daysInCurrentStatus = number.lastStatusChange 
-      ? differenceInDays(new Date(), new Date(number.lastStatusChange))
-      : null;
+    // Usa o hook de status info baseado no histórico
+    const statusInfo = statusInfoMap.get(number.id);
+    const daysInCurrentStatus = statusInfo?.daysInStatus ?? null;
+    const previousQualityFromHistory = statusInfo?.previousQuality;
+    const statusStartDate = statusInfo?.statusStartDate;
     
     return (
       <TooltipProvider key={number.id}>
@@ -310,7 +313,7 @@ const ProjectDetail = () => {
           <TableCell>
             <div className="flex items-center gap-2">
               <QualityBadge rating={number.qualityRating} />
-              {/* Indicador de dias no status atual */}
+              {/* Indicador de dias no status atual - calculado do histórico */}
               {daysInCurrentStatus !== null && daysInCurrentStatus >= 0 && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -348,15 +351,15 @@ const ProjectDetail = () => {
                 </Tooltip>
               )}
             </div>
-            {/* Status anterior e data da última mudança */}
-            {number.previousQuality && number.lastStatusChange && (
+            {/* Status anterior e data - calculado do histórico */}
+            {previousQualityFromHistory && statusStartDate && (
               <div className="text-[10px] text-muted-foreground mt-0.5">
                 <span className="opacity-70">
-                  Antes: {number.previousQuality === 'HIGH' ? 'Alta' : number.previousQuality === 'MEDIUM' ? 'Média' : 'Baixa'}
+                  Antes: {previousQualityFromHistory === 'HIGH' ? 'Alta' : previousQualityFromHistory === 'MEDIUM' ? 'Média' : 'Baixa'}
                 </span>
                 <span className="mx-1 opacity-50">•</span>
                 <span className="opacity-60">
-                  {format(new Date(number.lastStatusChange), "dd/MM/yy", { locale: ptBR })}
+                  {format(statusStartDate, "dd/MM/yy", { locale: ptBR })}
                 </span>
               </div>
             )}
