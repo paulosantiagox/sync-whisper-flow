@@ -352,15 +352,23 @@ const ProjectDetail = () => {
               )}
             </div>
             {/* Status anterior e data - calculado do histórico */}
-            {previousQualityFromHistory && statusStartDate && (
+            {statusStartDate && (
               <div className="text-[10px] text-muted-foreground mt-0.5">
-                <span className="opacity-70">
-                  Antes: {previousQualityFromHistory === 'HIGH' ? 'Alta' : previousQualityFromHistory === 'MEDIUM' ? 'Média' : 'Baixa'}
-                </span>
-                <span className="mx-1 opacity-50">•</span>
-                <span className="opacity-60">
-                  {format(statusStartDate, "dd/MM/yy", { locale: ptBR })}
-                </span>
+                {previousQualityFromHistory ? (
+                  <>
+                    <span className="opacity-70">
+                      Antes: {previousQualityFromHistory === 'HIGH' ? 'Alta' : previousQualityFromHistory === 'MEDIUM' ? 'Média' : 'Baixa'}
+                    </span>
+                    <span className="mx-1 opacity-50">•</span>
+                    <span className="opacity-60">
+                      {format(statusStartDate, "dd/MM/yy", { locale: ptBR })}
+                    </span>
+                  </>
+                ) : (
+                  <span className="opacity-60">
+                    Desde: {format(statusStartDate, "dd/MM/yy", { locale: ptBR })}
+                  </span>
+                )}
               </div>
             )}
           </TableCell>
