@@ -1,91 +1,49 @@
 
 
-## Adicionar Variável {numero} no Template de Disparo
+## Corrigir Barra de Rolagem no Modal de Histórico de Status
 
-### Objetivo
-Adicionar uma nova variável `{numero}` no template de cópia de disparos, exibindo o número de telefone completo abaixo da conta.
+### Problema Identificado
+A barra de rolagem não aparece no modal de "Histórico de Status" porque o `ScrollArea` não tem as constraints de altura necessárias para ativar o scroll em um container flexbox.
 
 ---
 
-### Arquivos a Modificar
+### Causa Raiz
+Em containers flexbox, elementos filhos tem `min-height: auto` por padrao, o que impede que o conteudo encolha abaixo do seu tamanho intrinseco. Isso faz com que o `ScrollArea` expanda para mostrar todo o conteudo ao inves de criar uma barra de rolagem.
+
+---
+
+### Arquivo a Modificar
 
 | Arquivo | Acao |
 |---------|------|
-| `src/components/modals/BroadcastTemplateConfigModal.tsx` | Atualizar template padrao e lista de variaveis |
-| `src/pages/Campaigns.tsx` | Adicionar substituicao da variavel {numero} |
+| `src/components/modals/StatusHistoryModal.tsx` | Adicionar constraints de altura ao ScrollArea |
 
 ---
 
-### Alteracoes Detalhadas
+### Alteracoes
 
-#### 1. BroadcastTemplateConfigModal.tsx
+**Linha 120 - Container principal:**
+```tsx
+// DE:
+<div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
 
-**Template Padrao (linhas 11-26)**
-Adicionar a linha do numero abaixo da conta:
-
-```text
-📱 *CONTA:* {conta}
-📞 *Número:* {numero}
-🔵 *Qualidade:* {qualidade}
+// PARA:
+<div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4 min-h-0">
 ```
 
-**Lista de Variaveis Copiadas (linhas 62-72)**
-Adicionar:
-```text
-{numero} - Número de telefone completo
+**Linha 173 - ScrollArea:**
+```tsx
+// DE:
+<ScrollArea className="flex-1 rounded-lg border">
+
+// PARA:
+<ScrollArea className="flex-1 rounded-lg border min-h-0 max-h-[40vh]">
 ```
 
-**Grid de Variaveis no Modal (linhas 127-138)**
-Adicionar nova linha:
-```html
-<span><code>{numero}</code> Número completo</span>
-```
+A classe `min-h-0` permite que o elemento flex encolha, e `max-h-[40vh]` garante uma altura maxima para ativar o scroll.
 
 ---
 
-#### 2. Campaigns.tsx
-
-**Funcao handleCopyBroadcast (linhas 223-233)**
-Adicionar a substituicao da nova variavel:
-
-```typescript
-.replace(/{numero}/g, phoneNum?.displayPhoneNumber || 'N/A')
-```
-
----
-
-### Resultado Visual
-
-**Template Padrao Atualizado:**
-```
-🚀 *DISPARO REALIZADO*
-
-📅 *Data:* {data}
-⏰ *Horário:* {hora}
-
-📱 *CONTA:* {conta}
-📞 *Número:* {numero}
-🔵 *Qualidade:* {qualidade}
-
-📋 *Lista:* {lista}
-📝 *Template:* {template}
-👥 *Contatos:* {contatos}
-
-🏷️ *Tipo:* {tipo}
-📊 *Status:* {status}
-
-{observacoes}
-```
-
-**Exemplo de Saida:**
-```
-📱 *CONTA:* Loja Principal
-📞 *Número:* +55 92 99999-9999
-🔵 *Qualidade:* 🟢 Alta
-```
-
----
-
-### Observacao
-Usuarios que ja salvaram um template personalizado nao verao o numero automaticamente - precisarao adicionar `{numero}` manualmente ou clicar em "Restaurar Padrao".
+### Resultado Esperado
+Apos a correcao, a lista de dias do historico tera uma barra de rolagem visivel quando houver mais itens do que cabem na area visivel, permitindo visualizar todos os dias.
 
