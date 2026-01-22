@@ -14,6 +14,7 @@ const DEFAULT_TEMPLATE = `🚀 *DISPARO REALIZADO*
 ⏰ *Horário:* {hora}
 
 📱 *CONTA:* {conta}
+📞 *Número:* {numero}
 🔵 *Qualidade:* {qualidade}
 
 📋 *Lista:* {lista}
@@ -63,6 +64,7 @@ const BroadcastTemplateConfigModal = ({ open, onOpenChange }: BroadcastTemplateC
 {data} - Data do disparo
 {hora} - Horário do disparo
 {conta} - Nome da conta WhatsApp
+{numero} - Número de telefone completo
 {qualidade} - Qualidade da conta (🟢 Alta / 🟡 Média / 🔴 Baixa)
 {lista} - Nome da lista
 {template} - Template utilizado
@@ -128,6 +130,7 @@ const BroadcastTemplateConfigModal = ({ open, onOpenChange }: BroadcastTemplateC
               <span><code className="bg-muted px-1 rounded">{'{data}'}</code> Data do disparo</span>
               <span><code className="bg-muted px-1 rounded">{'{hora}'}</code> Horário</span>
               <span><code className="bg-muted px-1 rounded">{'{conta}'}</code> Nome da conta</span>
+              <span><code className="bg-muted px-1 rounded">{'{numero}'}</code> Número completo</span>
               <span><code className="bg-muted px-1 rounded">{'{qualidade}'}</code> Qualidade</span>
               <span><code className="bg-muted px-1 rounded">{'{lista}'}</code> Nome da lista</span>
               <span><code className="bg-muted px-1 rounded">{'{template}'}</code> Template usado</span>

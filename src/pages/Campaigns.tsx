@@ -224,6 +224,7 @@ const Campaigns = () => {
         .replace(/{data}/g, format(parse(broadcast.date, 'yyyy-MM-dd', new Date()), "dd/MM/yyyy", { locale: ptBR }))
         .replace(/{hora}/g, broadcast.time)
         .replace(/{conta}/g, phoneNum?.customName || phoneNum?.verifiedName || 'N/A')
+        .replace(/{numero}/g, phoneNum?.displayPhoneNumber || 'N/A')
         .replace(/{qualidade}/g, qualityEmoji)
         .replace(/{lista}/g, broadcast.listName)
         .replace(/{template}/g, broadcast.templateUsed)
