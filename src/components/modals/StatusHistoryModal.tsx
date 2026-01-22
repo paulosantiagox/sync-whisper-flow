@@ -170,7 +170,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
           </div>
 
           {/* Lista de Dias (Expandível) */}
-          <ScrollArea className="flex-1 rounded-lg border min-h-0 max-h-[40vh]">
+          <ScrollArea className="rounded-lg border h-[calc(85vh-350px)] min-h-[200px]">
             <div className="p-4 space-y-3">
               {isLoading ? (
                 <div className="flex justify-center py-8">
