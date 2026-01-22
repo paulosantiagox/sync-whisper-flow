@@ -1,57 +1,91 @@
-# Plano: Corrigir Tipos de Acao (Action Types) nao aparecendo
 
-## Diagnostico
 
-O erro encontrado nos logs de rede:
+## Adicionar Variável {numero} no Template de Disparo
+
+### Objetivo
+Adicionar uma nova variável `{numero}` no template de cópia de disparos, exibindo o número de telefone completo abaixo da conta.
+
+---
+
+### Arquivos a Modificar
+
+| Arquivo | Acao |
+|---------|------|
+| `src/components/modals/BroadcastTemplateConfigModal.tsx` | Atualizar template padrao e lista de variaveis |
+| `src/pages/Campaigns.tsx` | Adicionar substituicao da variavel {numero} |
+
+---
+
+### Alteracoes Detalhadas
+
+#### 1. BroadcastTemplateConfigModal.tsx
+
+**Template Padrao (linhas 11-26)**
+Adicionar a linha do numero abaixo da conta:
+
+```text
+📱 *CONTA:* {conta}
+📞 *Número:* {numero}
+🔵 *Qualidade:* {qualidade}
 ```
-"column action_types.created_at does not exist"
+
+**Lista de Variaveis Copiadas (linhas 62-72)**
+Adicionar:
+```text
+{numero} - Número de telefone completo
 ```
 
-A tabela `action_types` no Supabase do usuario (dfrfeirfllwmdkenylwk) **nao possui a coluna `created_at`**, mas o codigo em `src/hooks/useCampaigns.ts` tenta ordenar por essa coluna.
+**Grid de Variaveis no Modal (linhas 127-138)**
+Adicionar nova linha:
+```html
+<span><code>{numero}</code> Número completo</span>
+```
 
-## Solucao
+---
 
-### Parte 1: Corrigir o codigo (remover ordenacao por coluna inexistente)
+#### 2. Campaigns.tsx
 
-Modificar `src/hooks/useCampaigns.ts` na funcao `useActionTypes` para nao ordenar por `created_at` ja que essa coluna nao existe na tabela.
+**Funcao handleCopyBroadcast (linhas 223-233)**
+Adicionar a substituicao da nova variavel:
 
-**Arquivo:** `src/hooks/useCampaigns.ts`
-
-**Alteracao na linha 275:**
 ```typescript
-// DE:
-.order('created_at', { ascending: false });
-
-// PARA:
-.order('name', { ascending: true });
+.replace(/{numero}/g, phoneNum?.displayPhoneNumber || 'N/A')
 ```
 
-Isso vai ordenar os tipos de acao alfabeticamente pelo nome, que e um comportamento aceitavel.
+---
 
-### Parte 2: (Opcional) Adicionar coluna created_at na tabela
+### Resultado Visual
 
-Se o usuario preferir ter a ordenacao por data de criacao, pode executar o seguinte SQL no dashboard do Supabase pessoal:
+**Template Padrao Atualizado:**
+```
+🚀 *DISPARO REALIZADO*
 
-```sql
--- Adicionar coluna created_at na tabela action_types
-ALTER TABLE public.action_types 
-ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+📅 *Data:* {data}
+⏰ *Horário:* {hora}
+
+📱 *CONTA:* {conta}
+📞 *Número:* {numero}
+🔵 *Qualidade:* {qualidade}
+
+📋 *Lista:* {lista}
+📝 *Template:* {template}
+👥 *Contatos:* {contatos}
+
+🏷️ *Tipo:* {tipo}
+📊 *Status:* {status}
+
+{observacoes}
 ```
 
-## Arquivos a Modificar
+**Exemplo de Saida:**
+```
+📱 *CONTA:* Loja Principal
+📞 *Número:* +55 92 99999-9999
+🔵 *Qualidade:* 🟢 Alta
+```
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useCampaigns.ts` | Remover ordenacao por `created_at` na funcao `useActionTypes` (linha 275) |
+---
 
-## Resultado Esperado
+### Observacao
+Usuarios que ja salvaram um template personalizado nao verao o numero automaticamente - precisarao adicionar `{numero}` manualmente ou clicar em "Restaurar Padrao".
 
-Apos a correcao:
-1. Os tipos de acao serao carregados corretamente
-2. O modal "Tipos de Acao" exibira todos os tipos cadastrados
-3. O filtro de tipos na tabela de disparos funcionara
-4. Criacao, edicao e exclusao de tipos de acao funcionarao
-
-## Arquivos Criticos para Implementacao
-
-- `src/hooks/useCampaigns.ts` - Contem o hook useActionTypes que precisa ser corrigido (linha 275)
