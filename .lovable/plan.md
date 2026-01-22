@@ -1,49 +1,51 @@
 
 
-## Corrigir Barra de Rolagem no Modal de Histórico de Status
+## Corrigir Barra de Rolagem do Histórico de Status
 
-### Problema Identificado
-A barra de rolagem não aparece no modal de "Histórico de Status" porque o `ScrollArea` não tem as constraints de altura necessárias para ativar o scroll em um container flexbox.
-
----
-
-### Causa Raiz
-Em containers flexbox, elementos filhos tem `min-height: auto` por padrao, o que impede que o conteudo encolha abaixo do seu tamanho intrinseco. Isso faz com que o `ScrollArea` expanda para mostrar todo o conteudo ao inves de criar uma barra de rolagem.
+### Problema
+O `max-h-[40vh]` está cortando a área de rolagem em apenas 4 dias. O modal tem 85vh de altura máxima, mas a área de scroll está sendo limitada artificialmente.
 
 ---
 
-### Arquivo a Modificar
+### Solução
 
-| Arquivo | Acao |
-|---------|------|
-| `src/components/modals/StatusHistoryModal.tsx` | Adicionar constraints de altura ao ScrollArea |
+Modificar o **`src/components/modals/StatusHistoryModal.tsx`** para usar uma abordagem flexbox correta:
 
----
-
-### Alteracoes
-
-**Linha 120 - Container principal:**
+#### Alteração 1 - DialogContent (linha 100)
+Adicionar `overflow-hidden` para garantir que o conteúdo interno controle o scroll:
 ```tsx
 // DE:
-<div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
+<DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
 
 // PARA:
-<div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4 min-h-0">
+<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
 ```
+(já está correto, manter assim)
 
-**Linha 173 - ScrollArea:**
+#### Alteração 2 - ScrollArea (linha 173)
+Remover o `max-h-[40vh]` e usar altura fixa calculada:
 ```tsx
 // DE:
-<ScrollArea className="flex-1 rounded-lg border">
-
-// PARA:
 <ScrollArea className="flex-1 rounded-lg border min-h-0 max-h-[40vh]">
+
+// PARA:
+<ScrollArea className="flex-1 rounded-lg border min-h-0 h-[300px]">
 ```
 
-A classe `min-h-0` permite que o elemento flex encolha, e `max-h-[40vh]` garante uma altura maxima para ativar o scroll.
+**OU** usar uma abordagem melhor com altura mínima e máxima mais generosa:
+
+```tsx
+// OPÇÃO MELHOR:
+<ScrollArea className="rounded-lg border h-[calc(85vh-350px)] min-h-[200px]">
+```
+
+Esta fórmula calcula:
+- 85vh = altura total do modal
+- 350px = espaço usado pelo header, cards de estatísticas, filtros e padding
+- Resultado: área de scroll usa todo o espaço restante
 
 ---
 
 ### Resultado Esperado
-Apos a correcao, a lista de dias do historico tera uma barra de rolagem visivel quando houver mais itens do que cabem na area visivel, permitindo visualizar todos os dias.
+Todos os 14 dias de monitoramento serão visíveis através da barra de rolagem, ocupando todo o espaço disponível no modal.
 
