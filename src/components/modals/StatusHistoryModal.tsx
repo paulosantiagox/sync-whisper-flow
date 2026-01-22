@@ -117,7 +117,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
           <div>{getStatusBadge(number.qualityRating)}</div>
         </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4">
+        <div className="flex-1 flex flex-col overflow-hidden space-y-4 mt-4 min-h-0">
           {/* Cards de Estatísticas */}
           {stats && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -170,7 +170,7 @@ const StatusHistoryModal = ({ number, open, onOpenChange }: StatusHistoryModalPr
           </div>
 
           {/* Lista de Dias (Expandível) */}
-          <ScrollArea className="flex-1 rounded-lg border">
+          <ScrollArea className="flex-1 rounded-lg border min-h-0 max-h-[40vh]">
             <div className="p-4 space-y-3">
               {isLoading ? (
                 <div className="flex justify-center py-8">
