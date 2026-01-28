@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       // Fetch profile
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
+        .from('waba_profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Fetch role
       const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
+        .from('waba_user_roles')
         .select('role')
         .eq('user_id', userId)
         .maybeSingle();
@@ -187,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     const { error } = await supabase
-      .from('profiles')
+      .from('waba_profiles')
       .update({
         name: updates.name,
         email: updates.email,

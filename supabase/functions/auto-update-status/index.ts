@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     // Busca todos os schedules
     console.log('[AUTO_UPDATE] Buscando schedules...')
     const { data: schedules, error: scheduleError } = await supabase
-      .from('project_update_schedules')
+      .from('waba_project_update_schedules')
       .select('*')
 
     console.log(`[AUTO_UPDATE] Total schedules: ${schedules?.length || 0}`)
@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
         // DEDUPLICAÇÃO: Tenta inserir na tabela de execuções
         // Se já existe, o insert falha e pulamos
         const { error: execError } = await supabase
-          .from('project_schedule_executions')
+          .from('waba_project_schedule_executions')
           .insert({
             project_id: projectId,
             schedule_time: scheduleTime,
@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
 
         // Busca business managers do projeto
         const { data: bms, error: bmsError } = await supabase
-          .from('business_managers')
+          .from('waba_business_managers')
           .select('id, access_token')
           .eq('project_id', projectId)
 
@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
         // Para cada BM, buscar números ativos
         for (const bm of bms || []) {
           const { data: numbers, error: numbersError } = await supabase
-            .from('whatsapp_numbers')
+            .from('waba_whatsapp_numbers')
             .select('*')
             .eq('business_manager_id', bm.id)
             .eq('is_visible', true)
@@ -203,7 +203,7 @@ Deno.serve(async (req) => {
 
               // Atualizar número
               const { error: updateError } = await supabase
-                .from('whatsapp_numbers')
+                .from('waba_whatsapp_numbers')
                 .update(updateData)
                 .eq('id', num.id)
 
@@ -216,7 +216,7 @@ Deno.serve(async (req) => {
 
               // Registrar no histórico - SEMPRE salva o status atual no momento da verificação
               // O campo previous_quality no histórico guarda o status ANTES da mudança
-              const { error: historyError } = await supabase.from('status_history').insert({
+              const { error: historyError } = await supabase.from('waba_status_history').insert({
                 phone_number_id: num.id,
                 quality_rating: newQuality,
                 messaging_limit_tier: newLimit,
@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
                 const qualityValue: Record<string, number> = { HIGH: 3, MEDIUM: 2, LOW: 1 }
                 const direction = qualityValue[newQuality] > qualityValue[num.quality_rating] ? 'up' : 'down'
 
-                const { error: notifError } = await supabase.from('status_change_notifications').insert({
+                const { error: notifError } = await supabase.from('waba_status_change_notifications').insert({
                   phone_number_id: num.id,
                   project_id: projectId,
                   previous_quality: num.quality_rating,
@@ -266,7 +266,7 @@ Deno.serve(async (req) => {
         if (!execError || execError.message?.includes('does not exist')) {
           try {
             await supabase
-              .from('project_schedule_executions')
+              .from('waba_project_schedule_executions')
               .update({
                 numbers_checked: projectNumbersUpdated + projectErrors,
                 numbers_updated: projectNumbersUpdated,
@@ -286,7 +286,7 @@ Deno.serve(async (req) => {
 
     // Registrar execução na tabela de logs global
     try {
-      await supabase.from('auto_update_logs').insert({
+      await supabase.from('waba_auto_update_logs').insert({
         executed_at: new Date().toISOString(),
         brasilia_time: brasiliaTime,
         schedules_found: matchingSchedules.length,

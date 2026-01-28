@@ -18,7 +18,7 @@ export function useWhatsAppNumbers(projectId?: string) {
         {
           event: '*',
           schema: 'public',
-          table: 'whatsapp_numbers',
+          table: 'waba_whatsapp_numbers',
           filter: `project_id=eq.${projectId}`,
         },
         () => {
@@ -38,7 +38,7 @@ export function useWhatsAppNumbers(projectId?: string) {
     queryKey: ['whatsapp-numbers', projectId],
     queryFn: async () => {
       let query = supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -80,7 +80,7 @@ export function useAllWhatsAppNumbers() {
     queryKey: ['whatsapp-numbers-all'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -115,7 +115,7 @@ export function useCreateWhatsAppNumber() {
   return useMutation({
     mutationFn: async (number: Omit<WhatsAppNumber, 'id' | 'createdAt' | 'lastChecked'>) => {
       const { data, error } = await supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .insert({
           project_id: number.projectId,
           business_manager_id: number.businessManagerId,
@@ -181,7 +181,7 @@ export function useUpdateWhatsAppNumber() {
       if (updates.lastStatusChange !== undefined) updateData.last_status_change = updates.lastStatusChange;
 
       const { error } = await supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .update(updateData)
         .eq('id', id);
 
@@ -203,7 +203,7 @@ export function useDeleteWhatsAppNumber() {
   return useMutation({
     mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
       const { error } = await supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .delete()
         .eq('id', id);
 

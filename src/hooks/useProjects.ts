@@ -13,7 +13,7 @@ export function useProjects() {
       if (!user) return [];
       
       let query = supabase
-        .from('projects')
+        .from('waba_projects')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -48,7 +48,7 @@ export function useAllProjects() {
     queryKey: ['all-projects'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -73,7 +73,7 @@ export function useProject(id: string) {
     queryKey: ['project', id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .select('*')
         .eq('id', id)
         .maybeSingle();
@@ -104,7 +104,7 @@ export function useCreateProject() {
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .insert({
           user_id: user.id,
           name: project.name,
@@ -123,7 +123,7 @@ export function useCreateProject() {
       ];
 
       const { error: scheduleError } = await supabase
-        .from('project_update_schedules')
+        .from('waba_project_update_schedules')
         .insert(defaultSchedules);
 
       if (scheduleError) {
@@ -151,7 +151,7 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; name?: string; description?: string }) => {
       const { error } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .update({
           name: updates.name,
           description: updates.description,
@@ -179,7 +179,7 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .delete()
         .eq('id', id);
 

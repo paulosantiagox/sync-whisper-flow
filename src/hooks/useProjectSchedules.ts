@@ -27,7 +27,7 @@ export function useProjectSchedules(projectId?: string) {
       if (!projectId) return [];
       
       const { data, error } = await supabase
-        .from('project_update_schedules')
+        .from('waba_project_update_schedules')
         .select('*')
         .eq('project_id', projectId)
         .order('order', { ascending: true });
@@ -54,7 +54,7 @@ export function useCreateProjectSchedule() {
   return useMutation({
     mutationFn: async ({ projectId, time, order }: { projectId: string; time: string; order: number }) => {
       const { data, error } = await supabase
-        .from('project_update_schedules')
+        .from('waba_project_update_schedules')
         .insert({
           project_id: projectId,
           time,
@@ -82,7 +82,7 @@ export function useUpdateProjectSchedule() {
   return useMutation({
     mutationFn: async ({ id, projectId, time }: { id: string; projectId: string; time: string }) => {
       const { error } = await supabase
-        .from('project_update_schedules')
+        .from('waba_project_update_schedules')
         .update({ time })
         .eq('id', id);
 
@@ -104,7 +104,7 @@ export function useDeleteProjectSchedule() {
   return useMutation({
     mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
       const { error } = await supabase
-        .from('project_update_schedules')
+        .from('waba_project_update_schedules')
         .delete()
         .eq('id', id);
 
