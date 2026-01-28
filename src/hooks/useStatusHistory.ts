@@ -13,7 +13,7 @@ export function useStatusHistory(phoneNumberId?: string) {
       if (!phoneNumberId) return [];
       
       const { data, error } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .select('*')
         .eq('phone_number_id', phoneNumberId)
         .order('changed_at', { ascending: false });
@@ -99,7 +99,7 @@ export function useCreateStatusHistory() {
   return useMutation({
     mutationFn: async (history: Omit<StatusHistory, 'id'>) => {
       const { data, error } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .insert({
           phone_number_id: history.phoneNumberId,
           quality_rating: history.qualityRating,
@@ -136,7 +136,7 @@ export function useUpdateLastStatusHistory() {
     mutationFn: async ({ phoneNumberId, newTimestamp }: { phoneNumberId: string; newTimestamp: string }) => {
       // Busca o último registro do número
       const { data: lastRecord, error: selectError } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .select('id')
         .eq('phone_number_id', phoneNumberId)
         .order('changed_at', { ascending: false })
@@ -148,7 +148,7 @@ export function useUpdateLastStatusHistory() {
 
       // Atualiza o timestamp
       const { error: updateError } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .update({ changed_at: newTimestamp })
         .eq('id', lastRecord.id);
 
@@ -184,7 +184,7 @@ export function useUpdateOrCreateDailyHistory() {
       
       // Busca o último registro do número
       const { data: lastRecord, error: selectError } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .select('*')
         .eq('phone_number_id', phoneNumberId)
         .order('changed_at', { ascending: false })
@@ -201,7 +201,7 @@ export function useUpdateOrCreateDailyHistory() {
         if (lastDateStart.getTime() === todayStart.getTime()) {
           // Mesmo dia - apenas atualiza o timestamp
           const { error: updateError } = await supabase
-            .from('status_history')
+            .from('waba_status_history')
             .update({ changed_at: now.toISOString() })
             .eq('id', lastRecord.id);
 
@@ -212,7 +212,7 @@ export function useUpdateOrCreateDailyHistory() {
 
       // Dia diferente ou sem registros - cria novo registro
       const { data, error } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .insert({
           phone_number_id: phoneNumberId,
           quality_rating: qualityRating,
@@ -245,7 +245,7 @@ export function useStatusChangeNotifications(phoneNumberId?: string) {
       if (!phoneNumberId) return [];
       
       const { data, error } = await supabase
-        .from('status_change_notifications')
+        .from('waba_status_change_notifications')
         .select('*')
         .eq('phone_number_id', phoneNumberId)
         .order('changed_at', { ascending: false });
@@ -272,7 +272,7 @@ export function useAllStatusChangeNotifications(projectId?: string) {
     queryKey: ['status-notifications-all', projectId],
     queryFn: async () => {
       let query = supabase
-        .from('status_change_notifications')
+        .from('waba_status_change_notifications')
         .select('*')
         .order('changed_at', { ascending: false })
         .limit(50);
@@ -305,7 +305,7 @@ export function useCreateStatusChangeNotification() {
   return useMutation({
     mutationFn: async (notification: Omit<StatusChangeNotification, 'id'>) => {
       const { data, error } = await supabase
-        .from('status_change_notifications')
+        .from('waba_status_change_notifications')
         .insert({
           phone_number_id: notification.phoneNumberId,
           project_id: notification.projectId,
@@ -334,7 +334,7 @@ export function useClearNumberNotifications() {
   return useMutation({
     mutationFn: async (phoneNumberId: string) => {
       const { error } = await supabase
-        .from('status_change_notifications')
+        .from('waba_status_change_notifications')
         .delete()
         .eq('phone_number_id', phoneNumberId);
 

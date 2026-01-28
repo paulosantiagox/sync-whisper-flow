@@ -9,7 +9,7 @@ export function useUsers() {
     queryFn: async () => {
       // Fetch profiles
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('waba_profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -17,7 +17,7 @@ export function useUsers() {
 
       // Fetch roles
       const { data: roles, error: rolesError } = await supabase
-        .from('user_roles')
+        .from('waba_user_roles')
         .select('*');
 
       if (rolesError) throw rolesError;
@@ -96,7 +96,7 @@ export function useUpdateUserRole() {
     mutationFn: async ({ userId, role }: { userId: string; role: 'master' | 'user' }) => {
       // Check if role exists
       const { data: existingRole } = await supabase
-        .from('user_roles')
+        .from('waba_user_roles')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle();
@@ -104,7 +104,7 @@ export function useUpdateUserRole() {
       if (existingRole) {
         // Update existing role
         const { error } = await supabase
-          .from('user_roles')
+          .from('waba_user_roles')
           .update({ role })
           .eq('user_id', userId);
 
@@ -112,7 +112,7 @@ export function useUpdateUserRole() {
       } else {
         // Insert new role
         const { error } = await supabase
-          .from('user_roles')
+          .from('waba_user_roles')
           .insert({ user_id: userId, role });
 
         if (error) throw error;
@@ -136,7 +136,7 @@ export function useDeleteUser() {
     mutationFn: async (userId: string) => {
       // Delete from profiles (cascade will handle user_roles)
       const { error } = await supabase
-        .from('profiles')
+        .from('waba_profiles')
         .delete()
         .eq('id', userId);
 
@@ -159,13 +159,13 @@ export function useUserStats() {
     queryKey: ['user-stats'],
     queryFn: async () => {
       const { data: profiles, error } = await supabase
-        .from('profiles')
+        .from('waba_profiles')
         .select('id, status');
 
       if (error) throw error;
 
       const { data: roles } = await supabase
-        .from('user_roles')
+        .from('waba_user_roles')
         .select('user_id, role');
 
       const masterIds = roles?.filter(r => r.role === 'master').map(r => r.user_id) || [];

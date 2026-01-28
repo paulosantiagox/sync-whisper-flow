@@ -15,7 +15,7 @@ export function useBusinessManagers(projectId?: string) {
       console.log('Auth userId:', sessionData.session?.user?.id ?? null);
 
       let query = supabase
-        .from('business_managers')
+        .from('waba_business_managers')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -31,7 +31,7 @@ export function useBusinessManagers(projectId?: string) {
       // Se vier vazio, testa visibilidade geral (se RLS estiver bloqueando, isso também virá vazio)
       if (projectId && (!data || data.length === 0)) {
         const { data: anyVisible, error: anyVisibleError } = await supabase
-          .from('business_managers')
+          .from('waba_business_managers')
           .select('id, project_id')
           .order('created_at', { ascending: false })
           .limit(5);
@@ -65,7 +65,7 @@ export function useCreateBusinessManager() {
   return useMutation({
     mutationFn: async (bm: Omit<BusinessManager, 'id' | 'createdAt'>) => {
       const { data, error } = await supabase
-        .from('business_managers')
+        .from('waba_business_managers')
         .insert({
           project_id: bm.projectId,
           main_bm_name: bm.mainBmName,
@@ -99,7 +99,7 @@ export function useUpdateBusinessManager() {
   return useMutation({
     mutationFn: async ({ id, projectId, ...updates }: Partial<BusinessManager> & { id: string; projectId: string }) => {
       const { error } = await supabase
-        .from('business_managers')
+        .from('waba_business_managers')
         .update({
           main_bm_name: updates.mainBmName,
           main_bm_id: updates.mainBmId,
@@ -130,7 +130,7 @@ export function useDeleteBusinessManager() {
   return useMutation({
     mutationFn: async ({ id, projectId }: { id: string; projectId: string }) => {
       const { error } = await supabase
-        .from('business_managers')
+        .from('waba_business_managers')
         .delete()
         .eq('id', id);
 

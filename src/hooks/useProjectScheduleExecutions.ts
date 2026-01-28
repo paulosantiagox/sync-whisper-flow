@@ -29,7 +29,7 @@ export function useProjectScheduleExecutions(projectId?: string) {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'project_schedule_executions',
+          table: 'waba_project_schedule_executions',
           filter: `project_id=eq.${projectId}`,
         },
         () => {
@@ -57,7 +57,7 @@ export function useProjectScheduleExecutions(projectId?: string) {
       const todayStr = today.toISOString().split('T')[0];
       
       const { data, error } = await supabase
-        .from('project_schedule_executions')
+        .from('waba_project_schedule_executions')
         .select('*')
         .eq('project_id', projectId)
         .eq('execution_date', todayStr)
@@ -93,7 +93,7 @@ export function useLastProjectExecution(projectId?: string) {
       if (!projectId) return null;
       
       const { data, error } = await supabase
-        .from('project_schedule_executions')
+        .from('waba_project_schedule_executions')
         .select('*')
         .eq('project_id', projectId)
         .order('executed_at', { ascending: false })

@@ -15,7 +15,7 @@ export function useCampaigns() {
       if (!user) return [];
 
       let query = supabase
-        .from('campaigns')
+        .from('waba_campaigns')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -51,7 +51,7 @@ export function useCreateCampaign() {
       if (!user) throw new Error('User not authenticated');
 
       const { data, error } = await supabase
-        .from('campaigns')
+        .from('waba_campaigns')
         .insert({
           user_id: user.id,
           name: campaign.name,
@@ -82,7 +82,7 @@ export function useUpdateCampaign() {
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Campaign> & { id: string }) => {
       const { error } = await supabase
-        .from('campaigns')
+        .from('waba_campaigns')
         .update({
           name: updates.name,
           description: updates.description,
@@ -110,7 +110,7 @@ export function useDeleteCampaign() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from('campaigns')
+        .from('waba_campaigns')
         .delete()
         .eq('id', id);
 
@@ -136,7 +136,7 @@ export function useBroadcasts(campaignId?: string) {
       if (!campaignId) return [];
       
       const { data, error } = await supabase
-        .from('broadcasts')
+        .from('waba_broadcasts')
         .select('*')
         .eq('campaign_id', campaignId)
         .order('date', { ascending: false });
@@ -170,7 +170,7 @@ export function useCreateBroadcast() {
   return useMutation({
     mutationFn: async (broadcast: Omit<Broadcast, 'id' | 'createdAt'>) => {
       const { data, error } = await supabase
-        .from('broadcasts')
+        .from('waba_broadcasts')
         .insert({
           campaign_id: broadcast.campaignId,
           date: broadcast.date,
@@ -208,7 +208,7 @@ export function useUpdateBroadcast() {
   return useMutation({
     mutationFn: async ({ id, campaignId, ...updates }: Partial<Broadcast> & { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('broadcasts')
+        .from('waba_broadcasts')
         .update({
           date: updates.date,
           time: updates.time,
@@ -243,7 +243,7 @@ export function useDeleteBroadcast() {
   return useMutation({
     mutationFn: async ({ id, campaignId }: { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('broadcasts')
+        .from('waba_broadcasts')
         .delete()
         .eq('id', id);
 
@@ -269,7 +269,7 @@ export function useActionTypes(campaignId?: string) {
       if (!campaignId) return [];
       
       const { data, error } = await supabase
-        .from('action_types')
+        .from('waba_action_types')
         .select('*')
         .eq('campaign_id', campaignId)
         .order('name', { ascending: true });
@@ -295,7 +295,7 @@ export function useCreateActionType() {
   return useMutation({
     mutationFn: async (actionType: Omit<ActionType, 'id'>) => {
       const { data, error } = await supabase
-        .from('action_types')
+        .from('waba_action_types')
         .insert({
           campaign_id: actionType.campaignId,
           name: actionType.name,
@@ -326,7 +326,7 @@ export function useUpdateActionType() {
   return useMutation({
     mutationFn: async ({ id, campaignId, ...updates }: Partial<ActionType> & { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('action_types')
+        .from('waba_action_types')
         .update({
           name: updates.name,
           color: updates.color,
@@ -354,7 +354,7 @@ export function useDeleteActionType() {
   return useMutation({
     mutationFn: async ({ id, campaignId }: { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('action_types')
+        .from('waba_action_types')
         .delete()
         .eq('id', id);
 
@@ -380,7 +380,7 @@ export function useShortcuts(campaignId?: string) {
       if (!campaignId) return [];
       
       const { data, error } = await supabase
-        .from('campaign_shortcuts')
+        .from('waba_campaign_shortcuts')
         .select('*')
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false });
@@ -406,7 +406,7 @@ export function useCreateShortcut() {
   return useMutation({
     mutationFn: async (shortcut: Omit<CampaignShortcut, 'id' | 'createdAt'>) => {
       const { data, error } = await supabase
-        .from('campaign_shortcuts')
+        .from('waba_campaign_shortcuts')
         .insert({
           campaign_id: shortcut.campaignId,
           name: shortcut.name,
@@ -436,7 +436,7 @@ export function useUpdateShortcut() {
   return useMutation({
     mutationFn: async ({ id, campaignId, ...updates }: Partial<CampaignShortcut> & { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('campaign_shortcuts')
+        .from('waba_campaign_shortcuts')
         .update({
           name: updates.name,
           content: updates.content,
@@ -463,7 +463,7 @@ export function useDeleteShortcut() {
   return useMutation({
     mutationFn: async ({ id, campaignId }: { id: string; campaignId: string }) => {
       const { error } = await supabase
-        .from('campaign_shortcuts')
+        .from('waba_campaign_shortcuts')
         .delete()
         .eq('id', id);
 

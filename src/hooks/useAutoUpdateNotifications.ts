@@ -18,7 +18,7 @@ export function useAutoUpdateNotifications(projectId: string | undefined) {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'whatsapp_numbers',
+          table: 'waba_whatsapp_numbers',
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
