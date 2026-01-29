@@ -21,7 +21,7 @@ interface StatusHistoryRecord {
 }
 
 /**
- * Hook que calcula informações de status baseado no histórico da tabela status_history.
+ * Hook que calcula informações de status baseado no histórico da tabela waba_status_history.
  * - Busca o histórico de todos os números do projeto de uma vez (query em batch)
  * - Calcula há quantos dias cada número está no status atual
  * - Identifica o status anterior de cada número
@@ -41,7 +41,7 @@ export function useNumberStatusInfo(numbers: WhatsAppNumber[]) {
       for (let i = 0; i < numberIds.length; i += chunkSize) {
         const chunk = numberIds.slice(i, i + chunkSize);
         const { data, error } = await supabase
-          .from('status_history')
+          .from('waba_status_history')
           .select('id, phone_number_id, quality_rating, changed_at, previous_quality')
           .in('phone_number_id', chunk)
           .order('changed_at', { ascending: false });

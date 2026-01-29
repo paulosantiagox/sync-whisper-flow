@@ -23,7 +23,7 @@ export function useRecentStatusChanges(projectIds?: string[]) {
 
       // Busca registros do histórico que tiveram mudança de status (previous_quality diferente de quality_rating)
       const { data: historyData, error: historyError } = await supabase
-        .from('status_history')
+        .from('waba_status_history')
         .select(`
           id,
           phone_number_id,
@@ -48,7 +48,7 @@ export function useRecentStatusChanges(projectIds?: string[]) {
       // Busca informações dos números
       const numberIds = [...new Set(realChanges.map(h => h.phone_number_id))];
       const { data: numbersData, error: numbersError } = await supabase
-        .from('whatsapp_numbers')
+        .from('waba_whatsapp_numbers')
         .select('id, custom_name, verified_name, display_phone_number, project_id')
         .in('id', numberIds);
 
@@ -61,7 +61,7 @@ export function useRecentStatusChanges(projectIds?: string[]) {
       // Busca nomes dos projetos
       const projectIdsFromNumbers = [...new Set(userNumbers.map(n => n.project_id))];
       const { data: projectsData, error: projectsError } = await supabase
-        .from('projects')
+        .from('waba_projects')
         .select('id, name')
         .in('id', projectIdsFromNumbers);
 
