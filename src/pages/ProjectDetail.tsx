@@ -130,7 +130,7 @@ const ProjectDetail = () => {
       for (let i = 0; i < ids.length; i += chunkSize) {
         const chunk = ids.slice(i, i + chunkSize);
         const { data, error } = await supabase
-          .from('status_history')
+          .from('waba_status_history')
           .select('phone_number_id')
           .in('phone_number_id', chunk);
 
