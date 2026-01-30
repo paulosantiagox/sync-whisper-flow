@@ -119,6 +119,7 @@ export function useCreateStatusHistory() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['status-history', variables.phoneNumberId] });
+      queryClient.invalidateQueries({ queryKey: ['number-errors'] });
       console.log('[STATUS_HISTORY] Histórico criado com sucesso');
     },
     onError: (error) => {

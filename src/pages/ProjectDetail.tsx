@@ -14,6 +14,7 @@ import { useBusinessManagers, useCreateBusinessManager, useUpdateBusinessManager
 import { useCreateStatusHistory, useClearNumberNotifications, useCreateStatusChangeNotification, useAllStatusChangeNotifications } from '@/hooks/useStatusHistory';
 import { useAutoUpdateNotifications } from '@/hooks/useAutoUpdateNotifications';
 import { useNumberStatusInfo } from '@/hooks/useNumberStatusInfo';
+import { useNumberErrorState } from '@/hooks/useNumberErrorState';
 import { WhatsAppNumber, BusinessManager, QualityRating } from '@/types';
 import { fetchPhoneNumberDetail, mapMetaQuality, mapMessagingLimit } from '@/services/metaApi';
 import { playNotificationSound } from '@/lib/sounds';
@@ -25,7 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, TrendingUp, TrendingDown, Bell, Clock } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Phone, Activity, MessageCircle, RefreshCw, EyeOff, Loader2, History, Edit2, Trash2, ArrowUpDown, Building2, MoreVertical, TrendingUp, TrendingDown, Bell, Clock, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -57,6 +58,10 @@ const ProjectDetail = () => {
   const { data: projectBMs = [] } = useBusinessManagers(id);
   const { data: statusNotifications = [] } = useAllStatusChangeNotifications(id);
   const { statusInfoMap } = useNumberStatusInfo(numbers);
+  
+  // Hook para buscar erros recentes de cada número
+  const numberIds = useMemo(() => numbers.map(n => n.id), [numbers]);
+  const { data: errorStateMap = new Map() } = useNumberErrorState(numberIds);
   
   const updateNumber = useUpdateWhatsAppNumber();
   const createNumber = useCreateWhatsAppNumber();
@@ -153,7 +158,38 @@ const ProjectDetail = () => {
 
       try {
         const detail = await fetchPhoneNumberDetail(number.phoneNumberId, bm.accessToken);
-        const newQuality = mapMetaQuality(detail.quality_rating) as QualityRating;
+        
+        // mapMetaQuality agora pode lançar erro se o valor for inválido
+        let newQuality: QualityRating;
+        try {
+          newQuality = mapMetaQuality(detail.quality_rating) as QualityRating;
+        } catch (mappingError) {
+          // Erro de mapeamento - registra no histórico mas MANTÉM o status atual
+          console.error(`[MANUAL_UPDATE] Erro de mapeamento para ${number.displayPhoneNumber}:`, mappingError);
+          
+          const errorMsg = mappingError instanceof Error ? mappingError.message : 'Erro de mapeamento de qualidade';
+          
+          // Registra erro no histórico
+          createStatusHistory.mutate({
+            phoneNumberId: number.id,
+            qualityRating: number.qualityRating, // MANTÉM o status atual
+            messagingLimitTier: number.messagingLimitTier,
+            changedAt: new Date().toISOString(),
+            isError: true,
+            errorMessage: errorMsg,
+            observation: `Erro na verificação: ${errorMsg}`,
+          });
+          
+          // Atualiza apenas lastChecked
+          updateNumber.mutate({
+            id: number.id,
+            updates: { lastChecked: new Date().toISOString() }
+          });
+          
+          errorCount++;
+          continue;
+        }
+        
         const newLimit = mapMessagingLimit(detail.messaging_limit_tier);
         const hasQualityChanged = number.qualityRating !== newQuality;
 
@@ -213,14 +249,35 @@ const ProjectDetail = () => {
 
         successCount++;
       } catch (error) {
-        console.error(`Error updating number ${number.displayPhoneNumber}:`, error);
+        // Erro de conexão/API - registra no histórico mas MANTÉM o status atual
+        console.error(`[MANUAL_UPDATE] Erro ao atualizar ${number.displayPhoneNumber}:`, error);
+        
+        const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido na API';
+        
+        // Registra erro no histórico
+        createStatusHistory.mutate({
+          phoneNumberId: number.id,
+          qualityRating: number.qualityRating, // MANTÉM o status atual
+          messagingLimitTier: number.messagingLimitTier,
+          changedAt: new Date().toISOString(),
+          isError: true,
+          errorMessage: errorMsg,
+          observation: `Erro na verificação manual: ${errorMsg}`,
+        });
+        
+        // Atualiza apenas lastChecked para indicar que tentou verificar
+        updateNumber.mutate({
+          id: number.id,
+          updates: { lastChecked: new Date().toISOString() }
+        });
+        
         errorCount++;
       }
     }
 
     setIsUpdating(false);
     if (errorCount > 0) {
-      toast.error(`${successCount} números atualizados, ${errorCount} com erro.`);
+      toast.error(`${successCount} números atualizados, ${errorCount} com erro. Verifique o ícone ⚠️ na linha de cada número.`);
       playNotificationSound('error');
     } else {
       toast.success(`✅ ${successCount} números verificados com sucesso!`);
@@ -295,6 +352,9 @@ const ProjectDetail = () => {
     const previousQualityFromHistory = statusInfo?.previousQuality;
     const statusStartDate = statusInfo?.statusStartDate;
     
+    // Estado de erro do número (últimas 24h)
+    const errorInfo = errorStateMap.get(number.id);
+    
     return (
       <TooltipProvider key={number.id}>
         <TableRow className={isInactive ? 'opacity-60' : ''}>
@@ -313,6 +373,31 @@ const ProjectDetail = () => {
           <TableCell>
             <div className="flex items-center gap-2">
               <QualityBadge rating={number.qualityRating} />
+              {/* Indicador de erro na consulta da API - últimas 24h */}
+              {errorInfo?.hasError && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="relative flex items-center">
+                      <AlertCircle className="w-4 h-4 text-destructive animate-pulse" />
+                      {errorInfo.errorCount > 1 && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-[14px] rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-0.5">
+                          {errorInfo.errorCount > 9 ? '9+' : errorInfo.errorCount}
+                        </span>
+                      )}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="space-y-1">
+                      <p className="font-semibold text-destructive">Erro na verificação</p>
+                      <p className="text-xs">{errorInfo.errorMessage}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(errorInfo.errorAt), "dd/MM HH:mm", { locale: ptBR })}
+                        {errorInfo.errorCount > 1 && ` (${errorInfo.errorCount} tentativas)`}
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )}
               {/* Indicador de dias no status atual - calculado do histórico */}
               {daysInCurrentStatus !== null && daysInCurrentStatus >= 0 && (
                 <Tooltip>
