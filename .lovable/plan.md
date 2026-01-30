@@ -1,117 +1,287 @@
 
-## Objetivo
-Fazer os números voltarem a aparecer no sistema corrigindo o bloqueio de acesso causado por RLS (policies) + função `has_role`, sem “chutar” nomes de colunas e sem quebrar as policies existentes.
+# Plano: Tratamento Robusto de Erros na Consulta da API Meta
+
+## Diagnóstico do Problema
+
+Identifiquei **três pontos críticos** que causam o comportamento reportado:
+
+### 1. Mapeamento de Qualidade com Fallback Errado
+
+**`src/services/metaApi.ts` (linha 36):**
+```typescript
+export const mapMetaQuality = (quality: string): 'HIGH' | 'MEDIUM' | 'LOW' => {
+  switch (quality) {
+    case 'GREEN': return 'HIGH';
+    case 'YELLOW': return 'MEDIUM';
+    case 'RED': return 'LOW';
+    default: return 'MEDIUM';  // ❌ PROBLEMA: força amarelo quando API retorna erro/undefined
+  }
+};
+```
+
+**Edge function (`auto-update-status/index.ts` linha 326-329):**
+```typescript
+function mapQuality(q: string): string {
+  const map = { GREEN: 'HIGH', YELLOW: 'MEDIUM', RED: 'LOW', UNKNOWN: 'UNKNOWN' }
+  return map[q] || q || 'UNKNOWN'  // ❌ Retorna UNKNOWN mas não é tratado depois
+}
+```
+
+### 2. Erros de API Não Registrados no Histórico
+
+Quando `metaData.error` existe, o código apenas faz `continue` sem:
+- Registrar no histórico que houve erro
+- Manter o status anterior do número
+- Notificar o usuário visualmente
+
+### 3. Sem Indicador Visual de Erro por Número
+
+O componente `ErrorBadge.tsx` existe mas **não está sendo usado** na linha do número em `ProjectDetail.tsx`.
 
 ---
 
-## O que eu já verifiquei no seu código (varredura)
-1. O app NÃO está usando o backend “Cloud” do projeto; ele está apontando para o seu banco pessoal diretamente:
-   - `src/lib/supabase.ts` usa URL/anon key fixos do seu projeto (`dfrfeirfllwmdkenylwk`).
-   - Ou seja: qualquer ajuste precisa ser feito nesse mesmo banco onde você está rodando o SQL.
+## Solução Proposta
 
-2. O frontend já usa o prefixo `waba_` em todas as queries relevantes:
-   - `waba_projects`, `waba_whatsapp_numbers`, `waba_business_managers`, `waba_user_roles`, `waba_profiles` etc.
-   - Então, “falta trocar prefixo no código” não parece ser o problema.
+### Parte 1: Modificar Edge Function para Tratar Erros Corretamente
 
-3. Pelo dump de colunas que você colou:
-   - `waba_projects` TEM `user_id`.
-   - `waba_user_roles` TEM `user_id`.
-   - `waba_whatsapp_numbers` NÃO tem `user_id` (e não precisa ter).
-   - `waba_business_managers` NÃO tem `user_id` (só `project_id`, e isso é normal).
+**Quando API retornar erro:**
+1. **NÃO atualizar** o `quality_rating` do número (manter anterior)
+2. **Registrar no histórico** com `is_error: true` e `error_message`
+3. **Atualizar** apenas `last_checked` para indicar que tentou verificar
+4. Incrementar contador de erros
 
-Isso é importante porque explica o seu erro atual:
-- O erro **`column "user_id" does not exist`** quase sempre acontece quando tentamos criar uma policy para uma tabela que **não tem** `user_id` (ex.: `waba_business_managers`) usando algo como `user_id = auth.uid()`.
+**Arquivo:** `supabase/functions/auto-update-status/index.ts`
 
----
+```text
+Mudanças:
+- Adicionar bloco de tratamento de erro que registra no histórico
+- Não alterar quality_rating quando há erro de API
+- Incluir error_message no registro
+```
 
-## Diagnóstico provável do seu erro atual
-Você tentou rodar um SQL “grande” (provavelmente o que eu te passei com CASCADE/recriação de policies), e em alguma parte ele tentou recriar policy para `waba_business_managers` (ou outra tabela) **como se ela tivesse** coluna `user_id`.
+### Parte 2: Modificar Atualização Manual (Frontend)
 
-Como `waba_business_managers` NÃO tem `user_id`, o Postgres aborta com:
-- `ERROR: 42703: column "user_id" does not exist`
+**Arquivo:** `src/pages/ProjectDetail.tsx` (função `handleUpdateAllStatus`)
 
----
+```text
+Mudanças:
+- Capturar erros da API e registrar no histórico com is_error: true
+- Manter status anterior quando há erro
+- Mostrar toast mais informativo sobre erros
+```
 
-## Estratégia de correção (sem derrubar policies à toa)
-### Parte A — Corrigir `has_role` sem DROP (mais seguro)
-Em vez de `DROP FUNCTION` (que dá erro de dependência e/ou te força a recriar policies), vamos fazer do jeito seguro:
+### Parte 3: Adicionar Indicador Visual de Erro na Linha
 
-1) Rodar apenas `CREATE OR REPLACE FUNCTION ...` para sobrescrever a função existente, sem CASCADE e sem apagar policies.
+**Arquivo:** `src/pages/ProjectDetail.tsx` (função `renderNumberRow`)
 
-Isso evita:
-- erro de dependência
-- risco de recriar policy errada
-- loop de “cai policy, recria policy”
+```text
+Mudanças:
+- Importar e usar ErrorBadge ou criar indicador inline
+- Buscar último registro de erro do histórico para cada número
+- Exibir ícone de alerta quando número tem erro recente
+```
 
-### Parte B — Só se você já perdeu policies por CASCADE
-Se você já rodou `DROP ... CASCADE` e suas policies sumiram, aí sim vamos recriar policies:
-- **sem usar `user_id` em tabelas que não têm `user_id`**
-- usando JOIN/EXISTS via `waba_projects.user_id` (porque BM e Numbers são “do projeto”, não “do usuário” diretamente)
+### Parte 4: Criar Hook para Buscar Estado de Erro
 
----
+**Novo arquivo:** `src/hooks/useNumberErrorState.ts`
 
-## Passos (ordem exata)
+```text
+- Hook que busca os últimos registros com is_error=true da tabela waba_status_history
+- Retorna Map<phoneNumberId, { hasError, errorMessage, errorAt }>
+```
 
-### 1) Executar um SQL mínimo e seguro para atualizar `has_role` (sem DROP)
-Vou te passar um bloco SQL limpo (sem CASCADE) que:
-- mantém suas policies intactas
-- apenas troca a implementação da função para apontar para `public.waba_user_roles`
+### Parte 5: Atualizar Tipos
 
-Critérios desse SQL:
-- Ter `SECURITY DEFINER`
-- `SET search_path = public`
-- Criar as duas assinaturas (`text` e `app_role`) para compatibilidade com policies antigas
+**Arquivo:** `src/types/index.ts`
 
-### 2) Verificar se ainda existe policy chamando `has_role(...)` e se a função já aponta para `waba_user_roles`
-Depois de rodar o SQL da função:
-- Recarregar o sistema e tentar entrar no projeto para ver os números.
-- Se ainda não aparecer, o próximo passo é confirmar se:
-  - a policy de SELECT em `waba_whatsapp_numbers` existe
-  - a policy está “linkando” o número ao projeto corretamente (`project_id`)
-  - não existe nenhuma policy ainda referenciando tabela antiga `public.user_roles` (ou algum tipo/assinatura antiga da função)
-
-### 3) Se você realmente precisa recriar policies: recriar do jeito certo (sem `bm.user_id`)
-Se você perdeu policies, vou te passar um segundo bloco SQL (separado) que:
-- habilita RLS em `waba_whatsapp_numbers` e `waba_business_managers` (se necessário)
-- cria policies baseadas em:
-  - `EXISTS (SELECT 1 FROM waba_projects p WHERE p.id = <tabela>.project_id AND (p.user_id = auth.uid() OR has_role(auth.uid(),'master')) )`
-
-Isso funciona porque:
-- `waba_business_managers` tem `project_id`
-- `waba_projects` tem `user_id`
-- logo não precisamos de `user_id` dentro de `waba_business_managers`
-
-### 4) Checagem no app (end-to-end)
-Depois do ajuste:
-- Abrir `/dashboard` → entrar em um projeto → confirmar que:
-  - lista de números carrega
-  - lista de BMs carrega
-- Se ainda vier vazio, usar os logs que já estão no código:
-  - `src/hooks/useBusinessManagers.ts` já loga `Erro RLS/Supabase:` no console.
-  - O próximo passo será você me mandar exatamente o erro que aparecer ali (isso nos diz se é RLS, se é “relation does not exist”, etc.)
+O tipo `StatusHistory` já tem os campos necessários:
+```typescript
+isError?: boolean;
+errorMessage?: string;
+```
 
 ---
 
-## Ajustes no código (somente se necessário)
-Pelo que vi, o frontend já está consistente com `waba_*`.
-Então mudança no código só entraria se:
-- alguma tabela no seu banco não bater com os nomes/colunas esperados pelo app (ex.: tipos diferentes, colunas faltando, etc.)
-- ou se quisermos adicionar um “debug screen” para exibir erros RLS direto na UI (para não depender do console)
+## Arquivos a Modificar
 
-No momento, o foco é corrigir o SQL sem quebrar policies e sem tentar usar `user_id` onde ele não existe.
-
----
-
-## Riscos / Garantias
-- Atualizar a função com `CREATE OR REPLACE` NÃO apaga dados.
-- Mesmo se você tivesse rodado `DROP FUNCTION ... CASCADE`, isso derruba policies (regras), não registros (dados).
-- O maior risco aqui é recriar policy errada (por isso a estratégia é evitar CASCADE e corrigir só a função).
+| Arquivo | Ação |
+|---------|------|
+| `supabase/functions/auto-update-status/index.ts` | Tratar erros da API sem alterar status |
+| `src/services/metaApi.ts` | Lançar exceção em vez de retornar fallback |
+| `src/pages/ProjectDetail.tsx` | Tratar erros e mostrar indicador visual |
+| `src/hooks/useNumberErrorState.ts` | **Criar** hook para buscar erros recentes |
+| `src/components/dashboard/ErrorBadge.tsx` | Ajustar para usar no contexto de linha |
 
 ---
 
-## O que eu preciso de você para concluir sem erro na primeira tentativa
-Como você já me mandou o dump das colunas (ótimo), o próximo passo é:
-- você colar aqui o bloco SQL exato que você tentou executar quando apareceu `column "user_id" does not exist` (mesmo que seja grande), OU
-- me dizer se você chegou a rodar algum `DROP ... CASCADE` e se as policies “sumiram”.
+## Fluxo de Tratamento de Erro (Após Correção)
 
-Assim eu te devolvo o SQL final “certinho” (mínimo e sem tocar em nada que não precise).
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    CONSULTA API META                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │  API respondeu? │
+                    └─────────────────┘
+                              │
+              ┌───────────────┴───────────────┐
+              │                               │
+              ▼                               ▼
+      ┌───────────────┐              ┌───────────────┐
+      │   SUCESSO     │              │    ERRO       │
+      │ (GREEN/YELLOW │              │ (timeout,     │
+      │  RED)         │              │  auth, etc)   │
+      └───────────────┘              └───────────────┘
+              │                               │
+              ▼                               ▼
+    ┌─────────────────┐            ┌──────────────────────┐
+    │ Atualiza status │            │ MANTÉM status atual  │
+    │ quality_rating  │            │ (não altera)         │
+    └─────────────────┘            └──────────────────────┘
+              │                               │
+              ▼                               ▼
+    ┌─────────────────┐            ┌──────────────────────┐
+    │ Histórico:      │            │ Histórico:           │
+    │ is_error: false │            │ is_error: true       │
+    │ quality_rating: │            │ quality_rating: null │
+    │   novo valor    │            │ error_message: "..." │
+    └─────────────────┘            └──────────────────────┘
+              │                               │
+              ▼                               ▼
+    ┌─────────────────┐            ┌──────────────────────┐
+    │ UI: Badge verde/│            │ UI: Badge atual +    │
+    │ amarelo/vermelho│            │ Ícone de erro ⚠️     │
+    └─────────────────┘            └──────────────────────┘
+```
+
+---
+
+## Detalhes Técnicos
+
+### Edge Function - Tratamento de Erro
+
+```typescript
+// Quando API retorna erro
+if (metaData.error) {
+  console.error(`[AUTO_UPDATE] Erro Meta:`, metaData.error.message)
+  
+  // Registra tentativa com erro no histórico
+  await supabase.from('waba_status_history').insert({
+    phone_number_id: num.id,
+    quality_rating: num.quality_rating, // MANTÉM o status atual
+    messaging_limit_tier: num.messaging_limit_tier,
+    changed_at: new Date().toISOString(),
+    is_error: true,
+    error_message: metaData.error.message || 'Erro desconhecido na API Meta',
+    observation: `Erro na verificação: ${metaData.error.message}`,
+  })
+  
+  // Atualiza apenas last_checked (para saber que tentou)
+  await supabase
+    .from('waba_whatsapp_numbers')
+    .update({ last_checked: new Date().toISOString() })
+    .eq('id', num.id)
+  
+  totalErrors++
+  projectErrors++
+  continue
+}
+
+// Validar se quality_rating veio corretamente
+if (!metaData.quality_rating || !['GREEN', 'YELLOW', 'RED'].includes(metaData.quality_rating)) {
+  // Resposta inesperada - trata como erro
+  await supabase.from('waba_status_history').insert({
+    phone_number_id: num.id,
+    quality_rating: num.quality_rating,
+    messaging_limit_tier: num.messaging_limit_tier,
+    changed_at: new Date().toISOString(),
+    is_error: true,
+    error_message: `Resposta inválida: quality_rating = ${metaData.quality_rating || 'undefined'}`,
+  })
+  
+  await supabase
+    .from('waba_whatsapp_numbers')
+    .update({ last_checked: new Date().toISOString() })
+    .eq('id', num.id)
+  
+  totalErrors++
+  projectErrors++
+  continue
+}
+```
+
+### Hook de Estado de Erro
+
+```typescript
+export function useNumberErrorState(numberIds: string[]) {
+  return useQuery({
+    queryKey: ['number-errors', numberIds],
+    queryFn: async () => {
+      // Busca registros recentes com is_error = true
+      const { data } = await supabase
+        .from('waba_status_history')
+        .select('phone_number_id, error_message, changed_at')
+        .in('phone_number_id', numberIds)
+        .eq('is_error', true)
+        .order('changed_at', { ascending: false })
+        .limit(100)
+      
+      // Agrupa por número (pega o erro mais recente de cada)
+      const errorMap = new Map()
+      data?.forEach(record => {
+        if (!errorMap.has(record.phone_number_id)) {
+          errorMap.set(record.phone_number_id, {
+            hasError: true,
+            errorMessage: record.error_message,
+            errorAt: record.changed_at
+          })
+        }
+      })
+      
+      return errorMap
+    }
+  })
+}
+```
+
+### Indicador Visual na Linha (Simples)
+
+Na função `renderNumberRow`, adicionar após o `QualityBadge`:
+
+```tsx
+{/* Indicador de erro de consulta */}
+{errorInfo?.hasError && (
+  <Tooltip>
+    <TooltipTrigger>
+      <AlertCircle className="w-4 h-4 text-destructive animate-pulse" />
+    </TooltipTrigger>
+    <TooltipContent>
+      <p className="font-medium text-destructive">Erro na última verificação</p>
+      <p className="text-xs">{errorInfo.errorMessage}</p>
+      <p className="text-xs text-muted-foreground">
+        {format(new Date(errorInfo.errorAt), "dd/MM HH:mm")}
+      </p>
+    </TooltipContent>
+  </Tooltip>
+)}
+```
+
+---
+
+## Resultado Esperado
+
+1. **Status preservado**: Quando a API falha, o número mantém seu status anterior (HIGH permanece HIGH)
+2. **Histórico completo**: Cada tentativa de verificação é registrada, incluindo erros
+3. **Visualização clara**: Ícone de alerta aparece na linha do número com erro
+4. **Rastreabilidade**: O modal de histórico mostra os registros de erro com a mensagem
+
+---
+
+## Riscos e Considerações
+
+- **Nenhum risco de perda de dados**: Apenas adiciona tratamento de erro
+- **Compatibilidade**: Usa campos `is_error` e `error_message` que já existem na tabela `waba_status_history`
+- **Performance**: Hook de erros usa query simples com índice em `phone_number_id`
+
