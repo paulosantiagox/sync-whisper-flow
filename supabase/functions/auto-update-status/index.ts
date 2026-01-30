@@ -172,8 +172,54 @@ Deno.serve(async (req) => {
               const metaResponse = await fetch(metaUrl)
               const metaData = await metaResponse.json()
 
+              // === TRATAMENTO DE ERRO: Não altera status, registra no histórico ===
               if (metaData.error) {
-                console.error(`[AUTO_UPDATE] Erro Meta:`, metaData.error.message)
+                const errorMsg = metaData.error.message || 'Erro desconhecido na API Meta'
+                console.error(`[AUTO_UPDATE] Erro Meta para ${num.display_phone_number}:`, errorMsg)
+                
+                // Registra tentativa com erro no histórico (MANTÉM o status atual)
+                await supabase.from('waba_status_history').insert({
+                  phone_number_id: num.id,
+                  quality_rating: num.quality_rating, // MANTÉM o status anterior
+                  messaging_limit_tier: num.messaging_limit_tier,
+                  changed_at: new Date().toISOString(),
+                  is_error: true,
+                  error_message: errorMsg,
+                  observation: `Erro na verificação automática: ${errorMsg}`,
+                })
+                
+                // Atualiza apenas last_checked (para saber que tentou verificar)
+                await supabase
+                  .from('waba_whatsapp_numbers')
+                  .update({ last_checked: new Date().toISOString() })
+                  .eq('id', num.id)
+                
+                totalErrors++
+                projectErrors++
+                continue
+              }
+
+              // === VALIDAÇÃO: Verifica se quality_rating é válido ===
+              if (!metaData.quality_rating || !['GREEN', 'YELLOW', 'RED'].includes(metaData.quality_rating)) {
+                const errorMsg = `Resposta inválida da API: quality_rating = ${metaData.quality_rating || 'undefined'}`
+                console.error(`[AUTO_UPDATE] ${errorMsg} para ${num.display_phone_number}`)
+                
+                // Registra como erro no histórico (MANTÉM o status atual)
+                await supabase.from('waba_status_history').insert({
+                  phone_number_id: num.id,
+                  quality_rating: num.quality_rating, // MANTÉM o status anterior
+                  messaging_limit_tier: num.messaging_limit_tier,
+                  changed_at: new Date().toISOString(),
+                  is_error: true,
+                  error_message: errorMsg,
+                  observation: `Resposta inesperada da API Meta`,
+                })
+                
+                await supabase
+                  .from('waba_whatsapp_numbers')
+                  .update({ last_checked: new Date().toISOString() })
+                  .eq('id', num.id)
+                
                 totalErrors++
                 projectErrors++
                 continue
