@@ -1,51 +1,72 @@
 
+# Plano: Corrigir Função has_role e Políticas RLS
 
-## Corrigir Barra de Rolagem do Histórico de Status
+## Diagnóstico
 
-### Problema
-O `max-h-[40vh]` está cortando a área de rolagem em apenas 4 dias. O modal tem 85vh de altura máxima, mas a área de scroll está sendo limitada artificialmente.
+O sistema não mostra os números porque as políticas RLS estão falhando com o erro:
+
+```
+"relation public.user_roles does not exist"
+```
+
+A função `public.has_role` (usada pelas policies de TODAS as tabelas) ainda referencia a tabela `public.user_roles`, que foi removida quando você limpou as views de compatibilidade.
+
+## Solução
+
+Você precisa rodar o SQL abaixo no seu banco Supabase pessoal (`dfrfeirfllwmdkenylwk`) para corrigir a função `has_role`:
 
 ---
 
-### Solução
+## SQL para Correção
 
-Modificar o **`src/components/modals/StatusHistoryModal.tsx`** para usar uma abordagem flexbox correta:
+```sql
+-- 1. Remove a função antiga (se existir com assinatura antiga)
+DROP FUNCTION IF EXISTS public.has_role(uuid, text);
+DROP FUNCTION IF EXISTS public.has_role(uuid, app_role);
 
-#### Alteração 1 - DialogContent (linha 100)
-Adicionar `overflow-hidden` para garantir que o conteúdo interno controle o scroll:
-```tsx
-// DE:
-<DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+-- 2. Recria a função apontando para waba_user_roles
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.waba_user_roles
+    WHERE user_id = _user_id
+      AND role::text = _role
+  )
+$$;
 
-// PARA:
-<DialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
+-- 3. Cria uma versão com app_role para compatibilidade (caso policies usem app_role)
+CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role app_role)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.waba_user_roles
+    WHERE user_id = _user_id
+      AND role = _role
+  )
+$$;
 ```
-(já está correto, manter assim)
-
-#### Alteração 2 - ScrollArea (linha 173)
-Remover o `max-h-[40vh]` e usar altura fixa calculada:
-```tsx
-// DE:
-<ScrollArea className="flex-1 rounded-lg border min-h-0 max-h-[40vh]">
-
-// PARA:
-<ScrollArea className="flex-1 rounded-lg border min-h-0 h-[300px]">
-```
-
-**OU** usar uma abordagem melhor com altura mínima e máxima mais generosa:
-
-```tsx
-// OPÇÃO MELHOR:
-<ScrollArea className="rounded-lg border h-[calc(85vh-350px)] min-h-[200px]">
-```
-
-Esta fórmula calcula:
-- 85vh = altura total do modal
-- 350px = espaço usado pelo header, cards de estatísticas, filtros e padding
-- Resultado: área de scroll usa todo o espaço restante
 
 ---
 
-### Resultado Esperado
-Todos os 14 dias de monitoramento serão visíveis através da barra de rolagem, ocupando todo o espaço disponível no modal.
+## O que acontece depois
 
+Uma vez que a função `has_role` aponte corretamente para `waba_user_roles`, todas as policies existentes que você já criou (como a de `waba_projects` que você mostrou) passarão a funcionar automaticamente.
+
+Não será necessário alterar nenhum código do aplicativo — o código já usa `waba_*` em todas as queries.
+
+---
+
+## Verificação pós-correção
+
+Depois de rodar o SQL, recarregue a página do Dashboard e entre em um projeto para verificar se os números aparecem.
